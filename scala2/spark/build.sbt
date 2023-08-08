@@ -1,4 +1,4 @@
-name := "scala-copy-pasta"
+name := "scala-cookbook-scala2-spark"
 
 scalaVersion := "2.11.11"
 
