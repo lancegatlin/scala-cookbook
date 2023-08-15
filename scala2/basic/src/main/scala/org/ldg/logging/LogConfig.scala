@@ -4,14 +4,27 @@ import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.typesafe.scalalogging.LazyLogging
 
 import scala.jdk.CollectionConverters._
-trait LogConfig extends LazyLogging {
-    def logConfig(
+
+object ConfigUtils {
+  /**
+   * Log config as a long string of newline separated values to an arbitrary function ensuring keys with sensitive
+   * values such as passwords or secrets are redacted in the output string
+   *
+   * @param cfg config to log
+   * @param excludeKey function that returns TRUE if key should be excluded from output
+   * @param redactKey function that returns TRUE if key's value should be redacted (i.e. replaced with ***)
+   * @param configRenderOptions config printing options
+   * @param log function to print config to (e.g. logger.info(_))
+   */
+  def logConfig(
       cfg: Config,
-      excludeKey: String => Boolean = { key => false },
-      redactKey: String => Boolean = { key => Seq( "passw", "secret" ).exists( key.contains ) },
+      excludeKey: String => Boolean = { _ => false },
+      redactKey: String => Boolean = { key =>
+        Seq( "passw", "secret" ).exists( key.contains )
+      },
       configRenderOptions: ConfigRenderOptions = ConfigRenderOptions.concise().setFormatted( true )
-  ): Unit =
-    logger.info {
+  )(log: String => Unit): Unit =
+    log {
       "Config:\n" +
         cfg
           .entrySet()
