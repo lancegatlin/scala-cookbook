@@ -1,13 +1,12 @@
 package org.ldg.test
 
+import com.typesafe.scalalogging.LazyLogging
+
 import java.nio.file.{Files, Path, Paths}
-
-import com.typesafe.scalalogging.slf4j.LazyLogging
-
 import scala.collection.JavaConverters._
 import org.apache.commons.io.FileUtils
 import org.ldg._
-import org.scalatest.Matchers
+import org.scalatest.matchers.should.Matchers
 
 import scala.io.Source
 import scala.util.Random

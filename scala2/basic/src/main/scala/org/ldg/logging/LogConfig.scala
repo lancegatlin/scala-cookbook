@@ -1,7 +1,6 @@
 package org.ldg.logging
 
 import com.typesafe.config.{Config, ConfigRenderOptions}
-import com.typesafe.scalalogging.LazyLogging
 
 import scala.jdk.CollectionConverters._
 

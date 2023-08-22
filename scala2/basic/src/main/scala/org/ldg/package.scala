@@ -27,7 +27,7 @@ package object ldg {
       * @param f side-effect function
       * @return self
       */
-    def effect(f: A => Unit) : A = {
+    def tap(f: A => Unit) : A = {
       f(self)
       self
     }
@@ -38,7 +38,7 @@ package object ldg {
       * @param f transformation function
       * @return new self
       */
-    def transform(f: A => A) : A = {
+    def mapX(f: A => A) : A = {
       f(self)
     }
 
@@ -48,9 +48,19 @@ package object ldg {
       * @param f transformation function
       * @return new self
       */
-    def maybeTransform[B](opt: Option[B])(f: (A,B) => A) : A = {
+    def mapX[B](opt: Option[B])(f: (A,B) => A) : A = {
       opt.fold(self)(b => f(self,b))
     }
+  }
+
+  object TryIt {
+    val builder = List.newBuilder[Int]
+    builder.tap(_ += 1).tap(_ += 2).tap(_ ++= Seq(3,4,5))
+
+    builder.mapX(_ += 1).mapX(_ += 2).mapX(_ ++= Seq(3,4,5))
+
+    val maybeV = Option(123456)
+    builder.mapX(maybeV)(_ += _)
   }
 
   implicit class MapStringStringExt(val self: Map[String,String]) extends AnyVal {
