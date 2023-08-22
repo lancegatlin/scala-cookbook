@@ -64,6 +64,7 @@ package object ldg {
     builder.maybeTransform(maybeV)(_ += _)
 
     builder.foldTransform(Seq(11,12,13))(_ += _)
+    builder.foldTransform(maybeV)(_ += _)
   }
 
   implicit class MapStringStringExt(val self: Map[String,String]) extends AnyVal {
