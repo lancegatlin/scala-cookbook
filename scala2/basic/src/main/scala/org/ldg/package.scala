@@ -38,9 +38,8 @@ package object ldg {
       * @param f transformation function
       * @return new self
       */
-    def mapX(f: A => A) : A = {
+    def transform(f: A => A) : A =
       f(self)
-    }
 
     /**
       * Maybe transform self if opt is set otherwise return self
@@ -48,19 +47,23 @@ package object ldg {
       * @param f transformation function
       * @return new self
       */
-    def mapX[B](opt: Option[B])(f: (A,B) => A) : A = {
+    def maybeTransform[B](opt: Option[B])(f: (A,B) => A) : A =
       opt.fold(self)(b => f(self,b))
-    }
+
+    def foldTransform[B](b: IterableOnce[B])(f: (A,B) => A): A =
+      b.iterator.foldLeft[A](self)(f)
   }
 
   object TryIt {
     val builder = List.newBuilder[Int]
     builder.tap(_ += 1).tap(_ += 2).tap(_ ++= Seq(3,4,5))
 
-    builder.mapX(_ += 1).mapX(_ += 2).mapX(_ ++= Seq(3,4,5))
+    builder.transform(_ += 1).transform(_ += 2).transform(_ ++= Seq(3,4,5))
 
     val maybeV = Option(123456)
-    builder.mapX(maybeV)(_ += _)
+    builder.maybeTransform(maybeV)(_ += _)
+
+    builder.foldTransform(Seq(11,12,13))(_ += _)
   }
 
   implicit class MapStringStringExt(val self: Map[String,String]) extends AnyVal {
