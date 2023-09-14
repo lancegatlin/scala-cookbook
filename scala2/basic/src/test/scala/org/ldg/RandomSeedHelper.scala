@@ -10,7 +10,7 @@ import org.scalatest.events.{Event, ExceptionalEvent}
   *  - fails on first failure
   *  - ensures failing random seed is reported for reproducing
   * note: could be replaced with ScalaCheck
- */
+  */
 trait RandomSeedHelper extends TestSuiteMixin { self: TestSuite with StrictLogging =>
   def repeatedTestCount: Int = 100
 
@@ -20,37 +20,39 @@ trait RandomSeedHelper extends TestSuiteMixin { self: TestSuite with StrictLoggi
     */
   def calcRandomSeed: Long = scala.util.Random.nextLong()
 
-  def setRandomSeed(seed: Long): Unit
+  def setRandomSeed( seed: Long ): Unit
 
-  private def repeatTests(testName: String, args: Args): (Status, Long) =
-    (0 until repeatedTestCount).foldLeft[(Status, Long)]((SucceededStatus, 0)) {
-      case (tuple@(FailedStatus, _), _) => tuple
-      case (_, times) =>
+  private def repeatTests( testName: String, args: Args ): ( Status, Long ) =
+    (0 until repeatedTestCount).foldLeft[( Status, Long )]( ( SucceededStatus, 0 ) ) {
+      case ( tuple @ ( FailedStatus, _ ), _ ) => tuple
+      case ( _, times ) =>
         val reporter = new Reporter {
-          override def apply(event: Event): Unit = event match {
+          override def apply( event: Event ): Unit = event match {
             // always report failure
-            case _: ExceptionalEvent => args.reporter(event)
+            case _: ExceptionalEvent => args.reporter( event )
             // report last success
-            case _ if times == repeatedTestCount - 1 => args.reporter(event)
-            case _ => // otherwise do nothing
+            case _ if times == repeatedTestCount - 1 => args.reporter( event )
+            case _                                   => // otherwise do nothing
           }
         }
         // each test run gets a new seed
         val randomSeed = calcRandomSeed
-        setRandomSeed(randomSeed)
-        val status = super.runTest(testName, args.copy(
-          reporter = reporter
-        ))
-        (status, randomSeed)
+        setRandomSeed( randomSeed )
+        val status = super.runTest(
+          testName,
+          args.copy(
+            reporter = reporter
+          ) )
+        ( status, randomSeed )
     }
-  protected abstract override def runTest(testName: String, args: Args): Status = {
-    val (finalStatus, finalRandomSeed) = repeatTests(testName, args)
+  abstract override protected def runTest( testName: String, args: Args ): Status = {
+    val ( finalStatus, finalRandomSeed ) = repeatTests( testName, args )
     finalStatus match {
-      case failedStatus@FailedStatus =>
+      case failedStatus @ FailedStatus =>
         val msg = s"Test failures with randomSeed=$finalRandomSeed"
-        logger.error(msg)
+        logger.error( msg )
         //scalastyle:off
-        Console.err.println(msg) // sometimes logging turned off by default
+        Console.err.println( msg ) // sometimes logging turned off by default
         //scalastyle:on
         failedStatus
       case status => status
