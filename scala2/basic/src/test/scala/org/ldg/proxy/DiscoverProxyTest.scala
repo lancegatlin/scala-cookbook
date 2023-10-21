@@ -1,10 +1,10 @@
 package org.ldg.proxy
 
 import java.net.InetSocketAddress
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-import org.scalatest.FlatSpec
-
-class DiscoverProxyTest extends FlatSpec {
+class DiscoverProxyTest extends AnyFlatSpec with Matchers {
 
   "discoverProxies" should "discover proxies" in {
     val fixture = new DiscoverProxies
