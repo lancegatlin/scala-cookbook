@@ -21,16 +21,14 @@ object Validator {
     *         any invalid elements, ensuring element index scope is prepended to error messages
     */
   def seq[A]( implicit validator: Validator[A] ): Validator[Seq[A]] = { xa =>
-    val validated = xa.zipWithIndex.map { case ( a, index ) => ( validator( a ), index ) }
-    val errors = validated.flatMap {
-      case ( Invalid( errors ), index ) =>
-        errors.map( prependScopeToError( s"[$index]", _ ) ).toList
-      case _ => Nil
-    }
-    errors match {
-      case Nil          => validated.collect { case ( Valid( a ), _ ) => a }.validNel
-      case head :: tail => NonEmptyList( head, tail ).invalid
-    }
+    val maybeErrors = xa
+      .iterator.map( validator ).zipWithIndex.flatMap {
+        case ( validated, index ) =>
+          prependScopeToErrors( s"[$index]", validated ).fold( _.iterator, _ => Iterator.empty )
+      }.toList
+    NonEmptyList
+      .fromList( maybeErrors )
+      .fold[ValidatedNel[String, Seq[A]]]( xa.valid )( _.invalid )
   }
 
   /**
@@ -73,6 +71,6 @@ object Validator {
       s"$scope: $error"
     }
 
-  def prependScopeToErrors[A]( v: ValidatedNel[String, A], scope: String ): ValidatedNel[String, A] =
+  def prependScopeToErrors[A]( scope: String, v: ValidatedNel[String, A] ): ValidatedNel[String, A] =
     v.leftMap( _.map( prependScopeToError( scope, _ ) ) )
 }

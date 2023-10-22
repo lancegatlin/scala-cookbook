@@ -14,7 +14,7 @@ trait StdValidators {
     *         to error messages
     */
   def validateField[A]( fieldName: String, fieldValue: A )( implicit validator: Validator[A] ): ValidatedNel[String, A] =
-    Validator.prependScopeToErrors( validator( fieldValue ), fieldName )
+    Validator.prependScopeToErrors( fieldName, validator( fieldValue ) )
 
   /**
     * @return a Validator that is Valid if all its elements are valid (or it is empty) and accumulates errors for
