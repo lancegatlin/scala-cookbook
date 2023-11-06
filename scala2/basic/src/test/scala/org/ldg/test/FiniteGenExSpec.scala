@@ -1,11 +1,12 @@
 package org.ldg.test
 
 import org.scalacheck.Gen
+import org.scalatest.Inside
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-class GenExSpec extends AnyFlatSpec with Matchers {
-  import GenEx._
+class FiniteGenExSpec extends AnyFlatSpec with Matchers with Inside {
+  import FiniteGenEx._
 
   "Gen.once([A])" should "generate a single value and then fail" in {
     val gen = Gen.once("a")
@@ -66,4 +67,34 @@ class GenExSpec extends AnyFlatSpec with Matchers {
     }
     gen.sample shouldBe None
   }
+
+  "FiniteGenExample" should "return expected results" in {
+    val stringGen2 =
+      Gen.once("") andThen
+      Gen.once(Gen.asciiChar.map(_.toString)) andThen
+      Gen.asciiStr
+
+    stringGen2.sample shouldBe Some("")
+    inside(stringGen2.sample) { case Some(result) =>
+      result.length shouldBe 1
+      (0 to 127).contains(result(0)) shouldBe true
+    }
+
+    def ensureAscii(s: String): Unit =
+      for (c <- s) {
+        (0 to 127).contains(c) shouldBe true
+      }
+
+    inside(stringGen2.sample) { case Some(result) =>
+      ensureAscii(result)
+    }
+    inside(stringGen2.sample) { case Some(result) =>
+      ensureAscii(result)
+    }
+    inside(stringGen2.sample) { case Some(result) =>
+      ensureAscii(result)
+    }
+    // infinite...
+  }
+
 }
