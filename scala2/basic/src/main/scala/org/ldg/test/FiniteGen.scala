@@ -24,6 +24,10 @@ import org.scalacheck.rng.Seed
   stringGen1 may not always generate empty string and may not always generate exactly one character in a particular
   test run. stringGen2 guarantees that every test run will start with empty string and then a string with exactly
   one character and after that uses the standard infinite Gen.
+
+ Note: due to ScalaCheck implementation choices, FiniteGen currently always uses a random seed. Though this isn't
+  expected to be an issue since FiniteGen generated values are always generated every test run and thus are easily
+  reproducible.
  */
 sealed trait FiniteGen[+A] {
   protected def asGen: Gen[A]
