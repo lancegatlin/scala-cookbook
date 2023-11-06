@@ -13,5 +13,7 @@ libraryDependencies ++= Seq(
   "com.typesafe" % "config" % "1.4.2",
   "commons-io" % "commons-io" % "2.6",
   "com.github.markusbernhardt" % "proxy-vole" % "1.0.5",
-  "org.scalatest" %% "scalatest" % "3.2.16", //% Test
+  "org.scalatest" %% "scalatest" % "3.2.17", //% Test
+  "org.scalacheck" %% "scalacheck" % "1.17.0",
+  "org.scalatestplus" %% "scalacheck-1-17" % "3.2.17.0",
 )
