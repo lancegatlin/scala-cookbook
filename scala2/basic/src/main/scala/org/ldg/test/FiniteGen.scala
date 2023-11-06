@@ -1,6 +1,7 @@
 package org.ldg.test
 
 import org.scalacheck.Gen
+import org.scalacheck.rng.Seed
 
 /**
   By default all ScalaCheck Gen are expected to generate infinite values. Gen sample failures are expected to be
@@ -24,9 +25,10 @@ import org.scalacheck.Gen
   test run. stringGen2 guarantees that every test run will start with empty string and then a string with exactly
   one character and after that uses the standard infinite Gen.
  */
-trait FiniteGen[+A] {
+sealed trait FiniteGen[+A] {
   protected def asGen: Gen[A]
 
+  def apply(p: Gen.Parameters, seed: Seed): Option[A] = asGen.apply(p, seed)
   def sample: Option[A] = asGen.sample
 
   /**
