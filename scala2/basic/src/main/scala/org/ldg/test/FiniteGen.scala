@@ -27,7 +27,7 @@ import org.scalacheck.rng.Seed
 
  Note: due to ScalaCheck implementation choices, FiniteGen currently always uses a random seed. Though this isn't
   expected to be an issue since FiniteGen generated values are always generated every test run and thus are easily
-  reproducible.
+  reproducible by prefixing FixitureGen.const of failing value.
  */
 sealed trait FiniteGen[+A] {
   protected def asGen: Gen[A]

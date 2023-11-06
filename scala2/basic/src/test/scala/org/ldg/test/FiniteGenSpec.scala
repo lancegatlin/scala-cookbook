@@ -1,6 +1,7 @@
 package org.ldg.test
 
-import org.scalacheck.Gen
+import org.scalacheck.{Gen, Test}
+import org.scalacheck.Prop.forAll
 import org.scalatest.Inside
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -95,6 +96,23 @@ class FiniteGenSpec extends AnyFlatSpec with Matchers with Inside {
       ensureAscii(result)
     }
     // infinite...
+
+    val stringGen3 =
+      FiniteGen.once("a") andThen
+        FiniteGen.once(Gen.asciiChar.map(_.toString)) andThen
+        Gen.asciiStr
+
+    var index = 0
+    val check = forAll(stringGen2) { s =>
+      if(index > 0) {
+        s.nonEmpty == true
+      } else {
+        s.isEmpty == true
+      }
+    }
+    check.check(Test.Parameters.default.withTestCallback(
+      with
+    ))
   }
 
 }
