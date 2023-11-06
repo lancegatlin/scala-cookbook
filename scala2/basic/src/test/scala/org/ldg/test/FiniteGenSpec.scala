@@ -5,11 +5,11 @@ import org.scalatest.Inside
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-class FiniteGenExSpec extends AnyFlatSpec with Matchers with Inside {
-  import FiniteGenEx._
+class FiniteGenSpec extends AnyFlatSpec with Matchers with Inside {
+  import FiniteGen._
 
   "Gen.once([A])" should "generate a single value and then fail" in {
-    val gen = Gen.once("a")
+    val gen = FiniteGen.once("a")
     gen.sample shouldBe Some("a")
     gen.sample shouldBe None
   }
@@ -23,14 +23,14 @@ class FiniteGenExSpec extends AnyFlatSpec with Matchers with Inside {
   })
 
   "Gen.once(Gen[A])" should "generate a single value and then fail" in {
-    val gen = Gen.once(mkListGen())
+    val gen = FiniteGen.once(mkListGen())
     gen.sample shouldBe Some(List(0, 1, 2, 3, 4, 5, 6, 7, 8, 9))
     gen.sample shouldBe None
   }
 
   "Gen.andThen" should "generate a values from a generator and then values from another generator" in {
-    val gen1 = Gen.once("a")
-    val gen2 = Gen.once("b")
+    val gen1 = FiniteGen.once("a")
+    val gen2 = FiniteGen.once("b")
     val gen = gen1.andThen(gen2)
     gen.sample shouldBe Some("a")
     gen.sample shouldBe Some("b")
@@ -38,7 +38,7 @@ class FiniteGenExSpec extends AnyFlatSpec with Matchers with Inside {
   }
 
   "Gen.allOf(Iterable)" should "generate all values and then fail" in {
-    val gen = Gen.allOf(Seq("a","b","c"))
+    val gen = FiniteGen.allOf(Seq("a","b","c"))
     gen.sample shouldBe Some("a")
     gen.sample shouldBe Some("b")
     gen.sample shouldBe Some("c")
@@ -48,8 +48,8 @@ class FiniteGenExSpec extends AnyFlatSpec with Matchers with Inside {
   "Gen.allOf(Gen[Iterable])" should "generate all values and then fail" in {
     val n = 10
     val listGen = mkListGen(n)
-    val listTwiceGen = Gen.once(listGen).andThen(Gen.once(listGen))
-    val gen = Gen.allOf(listTwiceGen)
+    val listTwiceGen = FiniteGen.once(listGen).andThen(FiniteGen.once(listGen))
+    val gen = FiniteGen.flatten(listTwiceGen)
     for(i <- 0 until n * 2) {
       gen.sample shouldBe Some(i)
     }
@@ -58,8 +58,8 @@ class FiniteGenExSpec extends AnyFlatSpec with Matchers with Inside {
 
   "Gen.zipConcat" should "alternate generator values from delegate generators" in {
     val n = 10
-    val gen1 = Gen.allOf(Gen.once(mkListGen(n)))
-    val gen2 = Gen.allOf(Gen.once(mkListGen(n, 100)))
+    val gen1 = FiniteGen.flatten(FiniteGen.once(mkListGen(n)))
+    val gen2 = FiniteGen.flatten(FiniteGen.once(mkListGen(n, 100)))
     val gen = gen1.zipConcat(gen2)
     for(i <- 0 until n) {
       gen.sample shouldBe Some(i)
@@ -70,8 +70,8 @@ class FiniteGenExSpec extends AnyFlatSpec with Matchers with Inside {
 
   "FiniteGenExample" should "return expected results" in {
     val stringGen2 =
-      Gen.once("") andThen
-      Gen.once(Gen.asciiChar.map(_.toString)) andThen
+      FiniteGen.once("") andThen
+      FiniteGen.once(Gen.asciiChar.map(_.toString)) andThen
       Gen.asciiStr
 
     stringGen2.sample shouldBe Some("")
