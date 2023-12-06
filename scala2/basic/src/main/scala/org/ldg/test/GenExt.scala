@@ -9,7 +9,7 @@ object GenExt {
     def sampleOrFail(implicit aClassTag: ClassTag[A]): A = self.sample.getOrElse(
       throw new RuntimeException(s"failed to sample Gen[${aClassTag.getClass.getSimpleName}]")
     )
-    def toLazyList: LazyList[A] =
+    def toLazyList(implicit aClassTag: ClassTag[A]): LazyList[A] =
       LazyList.continually(sampleOrFail)
   }
 }

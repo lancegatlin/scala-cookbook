@@ -110,9 +110,9 @@ class FiniteGenSpec extends AnyFlatSpec with Matchers with Inside {
         s.isEmpty == true
       }
     }
-    check.check(Test.Parameters.default.withTestCallback(
-      with
-    ))
+//    check.check(Test.Parameters.default.withTestCallback(
+//      with
+//    ))
   }
 
 }
