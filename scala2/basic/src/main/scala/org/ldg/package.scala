@@ -20,15 +20,16 @@ package object ldg {
       })
   }
 
-  implicit class AnyEffectExt[A](val self: A) extends AnyVal {
+  implicit class CatUtilAnyExt[A]( val self: A ) extends AnyVal {
+
     /**
-      * Sugar that allows creating a side-effect in a dot function stream:
+      * Run a side-effect on self and return self
       *
-      * @param f side-effect function
+      * @param sideEffect side-effect function
       * @return self
       */
-    def tap(f: A => Unit) : A = {
-      f(self)
+    def tap( sideEffect: A => Unit ): A = {
+      sideEffect( self )
       self
     }
 
@@ -36,22 +37,39 @@ package object ldg {
       * Transform self
       *
       * @param f transformation function
-      * @return new self
+      * @return result of calling f(self)
       */
-    def transform(f: A => A) : A =
-      f(self)
+    def transform( f: A => A ): A =
+      f( self )
+
+    /**
+      * Transform self if test value is true
+      * @param test true to transform self
+      * @param f transformation function
+      * @return if test is TRUE then f(self) otherwise unmodified self
+      */
+    def transformIf( test: Boolean )( f: A => A ): A =
+      if (test) f( self ) else self
 
     /**
       * Maybe transform self if opt is set otherwise return self
       *
+      * @param ob optional value
+      * @param f transformation function
+      * @return f(value, self) or if ob unset unmodified self
+      */
+    def maybeTransform[B]( ob: Option[B] )( f: ( A, B ) => A ): A =
+      ob.fold( self )( b => f( self, b ) )
+
+    /**
+      * Consecutively transform self for each value in a collection
+      *
+      * @param xb collection of values
       * @param f transformation function
       * @return new self
       */
-    def maybeTransform[B](opt: Option[B])(f: (A,B) => A) : A =
-      opt.fold(self)(b => f(self,b))
-
-    def foldTransform[B](b: IterableOnce[B])(f: (A,B) => A): A =
-      b.iterator.foldLeft[A](self)(f)
+    def foldTransform[B]( xb: IterableOnce[B] )( f: ( A, B ) => A ): A =
+      xb.iterator.foldLeft[A]( self )( f )
   }
 
   object TryIt {
