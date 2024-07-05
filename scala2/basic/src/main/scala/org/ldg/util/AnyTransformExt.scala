@@ -9,7 +9,7 @@ object AnyTransformExt {
       * @param f transformation function
       * @return result of calling f(self)
       */
-    def transform( f: A => A ): A =
+    def transform[B]( f: A => B ): B =
       f( self )
 
     /**

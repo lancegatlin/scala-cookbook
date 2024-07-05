@@ -15,6 +15,11 @@ class AnyTransformExtSpec extends AnyFlatSpec with Matchers {
     t.transform( _.addOne ) shouldBe Test( 2, "abc123" )
   }
 
+  "transform(function)" should "call transformer function and return new value" in {
+    val t = Test( 1, "abc123" )
+    t.transform( _.addOne.i ) shouldBe 2
+  }
+
   "transformIf(boolean)" should "call transformer function if test value is true and return modified self" in {
     val t = Test( 1, "abc123" )
     t.transformIf( false )( _.addOne ) shouldBe t
