@@ -1,4 +1,4 @@
-package org.ldg.util.retry
+package org.ldg.retry
 
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global

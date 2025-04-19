@@ -1,7 +1,7 @@
-package org.ldg.util.retry
+package org.ldg.retry
 
 import cats.effect.kernel.Clock
-import cats.implicits.{catsSyntaxApplicativeError, catsSyntaxApplicativeId, catsSyntaxMonadErrorRethrow, toFlatMapOps, toFunctorOps}
+import cats.implicits.{catsSyntaxApplicativeError, catsSyntaxMonadErrorRethrow, toFlatMapOps, toFunctorOps}
 import cats.{Monad, MonadError}
 import org.ldg.effect.Sleep
 

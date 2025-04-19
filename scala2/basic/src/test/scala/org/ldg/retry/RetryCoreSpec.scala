@@ -1,4 +1,4 @@
-package org.ldg.util.retry
+package org.ldg.retry
 
 import org.scalatest.Inside
 import org.scalatest.flatspec.AnyFlatSpec
@@ -8,7 +8,7 @@ import java.io.FileNotFoundException
 import scala.concurrent.duration.DurationInt
 
 class RetryCoreSpec extends AnyFlatSpec with Matchers with Inside {
-  import RetryCore._
+  import org.ldg.retry.RetryCore._
 
   "defaultShouldRetry" should "return false for unretryable exceptions" in {
     val unretryable = Seq(

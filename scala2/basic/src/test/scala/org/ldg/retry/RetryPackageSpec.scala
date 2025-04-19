@@ -1,4 +1,4 @@
-package org.ldg.util.retry
+package org.ldg.retry
 
 import java.util.concurrent.atomic.AtomicInteger
 import cats.effect.IO

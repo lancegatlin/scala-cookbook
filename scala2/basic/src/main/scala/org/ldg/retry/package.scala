@@ -1,4 +1,4 @@
-package org.ldg.util
+package org.ldg
 
 import cats.MonadError
 import cats.effect.Clock

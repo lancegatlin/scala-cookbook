@@ -1,4 +1,4 @@
-package org.ldg.util.retry.old
+package org.ldg.retry.old
 
 import ch.qos.logback.classic.Level
 import com.typesafe.scalalogging.{LazyLogging, Logger}

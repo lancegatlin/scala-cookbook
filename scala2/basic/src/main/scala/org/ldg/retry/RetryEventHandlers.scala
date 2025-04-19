@@ -1,8 +1,8 @@
-package org.ldg.util.retry
+package org.ldg.retry
 
 import cats.effect.kernel.Sync
 import cats.effect.std.Console
-import org.ldg.util.retry.RetryEvent.{OnAfterFailure, OnRetrySuccess}
+import RetryEvent.{OnAfterFailure, OnRetrySuccess}
 import org.slf4j.Logger
 import org.slf4j.event.Level
 

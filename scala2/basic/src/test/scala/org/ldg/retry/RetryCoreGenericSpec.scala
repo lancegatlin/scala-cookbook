@@ -1,4 +1,4 @@
-package org.ldg.util.retry
+package org.ldg.retry
 
 import cats.{Applicative, Monad}
 import org.ldg.effect.Sleep
@@ -10,7 +10,7 @@ import scala.concurrent.ExecutionException
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 abstract class RetryCoreGenericSpec[F[_]:Monad:Sleep] extends AnyFlatSpec with Matchers with Inside {
-  import RetryCore._
+  import org.ldg.retry.RetryCore._
 
   protected def testRunSync[A](f: F[A], timeout: FiniteDuration = 10.seconds): A
 

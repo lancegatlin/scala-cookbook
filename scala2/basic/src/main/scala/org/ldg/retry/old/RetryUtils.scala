@@ -1,4 +1,4 @@
-package org.ldg.util.retry.old
+package org.ldg.retry.old
 
 import java.io.FileNotFoundException
 import java.util.concurrent.{CompletableFuture, Executor, TimeUnit}

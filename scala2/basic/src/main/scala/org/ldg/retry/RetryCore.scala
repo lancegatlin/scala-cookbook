@@ -1,4 +1,4 @@
-package org.ldg.util.retry
+package org.ldg.retry
 
 import cats._
 import cats.implicits.toFlatMapOps

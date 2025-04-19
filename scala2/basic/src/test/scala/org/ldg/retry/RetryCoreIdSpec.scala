@@ -1,4 +1,4 @@
-package org.ldg.util.retry
+package org.ldg.retry
 
 import cats.Id
 import org.scalatest.concurrent.ScalaFutures

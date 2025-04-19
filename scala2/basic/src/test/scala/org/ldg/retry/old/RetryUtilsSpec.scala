@@ -1,6 +1,7 @@
-package org.ldg.util.retry.old
+package org.ldg.retry.old
 
-import org.ldg.util.retry.old.RetryUtils._
+import org.ldg
+import org.ldg.retry.old.RetryUtils._
 import org.scalatest.Inside
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpec
