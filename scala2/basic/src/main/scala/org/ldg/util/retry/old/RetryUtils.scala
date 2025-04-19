@@ -1,11 +1,11 @@
-package org.ldg.util
+package org.ldg.util.retry.old
 
 import java.io.FileNotFoundException
 import java.util.concurrent.{CompletableFuture, Executor, TimeUnit}
-import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.{DurationLong, FiniteDuration}
-import scala.util.control.NonFatal
+import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.FutureConverters._
+import scala.util.control.NonFatal
 import scala.util.{Failure, Random, Success, Try}
 
 object RetryUtils {

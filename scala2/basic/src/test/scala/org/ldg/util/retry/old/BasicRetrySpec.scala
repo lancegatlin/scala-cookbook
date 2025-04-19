@@ -1,4 +1,4 @@
-package org.ldg.util
+package org.ldg.util.retry.old
 
 import org.scalatest.Inside
 import org.scalatest.concurrent.ScalaFutures
@@ -11,7 +11,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration.{Duration, DurationInt}
 
 class BasicRetrySpec extends AnyFreeSpec with Matchers with ScalaFutures with Inside {
-  import BasicRetry._
+  import org.ldg.util.retry.old.BasicRetry._
 
   object ExampleUsage {
     import scala.concurrent.ExecutionContext.Implicits.global

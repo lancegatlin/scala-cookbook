@@ -1,15 +1,15 @@
-package org.ldg.test
+package org.ldg.util.retry.old
 
-import org.ldg.util.RetryUtils._
+import org.ldg.util.retry.old.RetryUtils._
 import org.scalatest.Inside
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import java.io.FileNotFoundException
-import scala.concurrent.{ExecutionException, Future}
-import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.concurrent.{ExecutionException, Future}
 import scala.util.{Failure, Success}
 
 class RetryUtilsSpec extends AnyFlatSpec with Matchers with ScalaFutures with Inside {
