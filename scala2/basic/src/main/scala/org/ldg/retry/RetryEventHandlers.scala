@@ -9,8 +9,6 @@ import org.ldg.effect.CaptureOrRunEffect
 import org.ldg.retry.RetryEvent.{OnAfterFailure, OnRetrySuccess}
 
 object RetryEventHandlers {
-  private lazy val defaultLogger: Slf4jLogger = org.slf4j.LoggerFactory.getLogger("RetryEventHandlers")
-
   def retryEventToLogMessage(fmtRetryState: RetryState => String): RetryEvent => (Slf4jLevel, String) = {
     case OnAfterFailure(retryState, cause, RetryAction.AttemptAgain(retryDelay)) =>
       (Slf4jLevel.INFO, s"Retrying failure (${fmtRetryState(retryState)}) after $retryDelay delay: $cause")
@@ -67,7 +65,7 @@ object RetryEventHandlers {
   }
 
   def slf4jLogEvent[F[_]:CaptureOrRunEffect](
-    logger: Slf4jLogger = defaultLogger,
+    logger: Slf4jLogger,
     fmtRetryState: RetryState => String = RetryState.fmtRetryState
   ): RetryEvent => F[Unit] = { retryEvent =>
       val maybeThrowable = retryEvent match {
