@@ -1,13 +1,12 @@
 package org.ldg.effect
 
+import scala.concurrent.duration._
+import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.util.{Success, Try}
 import cats.Id
 import cats.effect.unsafe.implicits.global
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-
-import scala.concurrent.duration._
-import scala.concurrent.{Await, ExecutionContext, Future}
-import scala.util.{Success, Try}
 
 class SleepSpec extends AnyFlatSpec with Matchers {
   implicit val executionContext: ExecutionContext = ExecutionContext.global
