@@ -10,6 +10,13 @@ import scala.concurrent.duration.DurationInt
 class RetryCoreSpec extends AnyFlatSpec with Matchers with Inside {
   import org.ldg.retry.RetryCore._
 
+  "defaultGenCorrelationId" should "generate a correlation id" in {
+    val correlationId = defaultGenCorrelationId()
+    correlationId should not be empty
+    correlationId.length should be > 0
+    correlationId.length shouldBe 36
+  }
+
   "defaultShouldRetry" should "return false for unretryable exceptions" in {
     val unretryable = Seq(
       new FileNotFoundException,

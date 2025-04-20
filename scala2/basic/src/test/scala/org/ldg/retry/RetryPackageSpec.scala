@@ -1,16 +1,16 @@
 package org.ldg.retry
 
 import java.util.concurrent.atomic.AtomicInteger
+import scala.concurrent.duration._
+import cats.Applicative
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import scala.concurrent.duration._
-
 class RetryPackageSpec extends AnyFlatSpec with Matchers {
-  implicit val defaultRetryConfig: RetryConfig[IO] = RetryConfig.default[IO].copy(
-    calcRetryDelay = { (_, _) => 0.millis }
+  implicit val defaultRetryConfig: RetryConfig[IO] = RetryConfig.default[IO]().copy(
+    calcRetryDelay = { (_, _) => Applicative[IO].pure(0.millis) }
   )
 
   "retry with maxAttempts" should "retry the specified number of times" in {

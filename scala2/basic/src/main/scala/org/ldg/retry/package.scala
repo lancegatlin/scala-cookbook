@@ -53,6 +53,8 @@ package object retry {
   def retry[F[_]](
      maxAttempts: Int,
      maxElapsedTime: FiniteDuration
+   )(implicit
+    retryConfig: RetryConfig[F]
    ): RetryPlan[F] = RetryPlan(maxAttempts, Some(maxElapsedTime))
 
   /**
@@ -60,14 +62,22 @@ package object retry {
    * @param maxAttempts maximum number of attempts
    * @return
    */
-  def retry[F[_]](maxAttempts: Int): RetryPlan[F] = RetryPlan(maxAttempts, None)
+  def retry[F[_]](
+    maxAttempts: Int
+  )(implicit
+    retryConfig: RetryConfig[F]
+  ): RetryPlan[F] = RetryPlan(maxAttempts, None)
 
   /**
    * Creates a RetryPlan with no max attempts and the given maxElapsedTime
    * @param maxElapsedTime maximum elapsed time since start of retry call to run another attempt
    * @return
    */
-  def retry[F[_]](maxElapsedTime: FiniteDuration): RetryPlan[F] = RetryPlan(Int.MaxValue, Some(maxElapsedTime))
+  def retry[F[_]](
+    maxElapsedTime: FiniteDuration
+  )(implicit
+    retryConfig: RetryConfig[F]
+  ): RetryPlan[F] = RetryPlan(Int.MaxValue, Some(maxElapsedTime))
 
   // Implicit helpers
 
@@ -89,7 +99,6 @@ package object retry {
     def withRetry(
       retryPlan: RetryPlan[M]
     )(implicit
-      retryConfig: RetryConfig[M],
       monadErrorM: MonadError[M, Throwable],
       sleepM: Sleep[M],
       clockM: Clock[M]
@@ -103,7 +112,6 @@ package object retry {
     def withRetry(
       retryPlan: RetryPlan[M]
     )(implicit
-      retryConfig: RetryConfig[M],
       monadErrorM: MonadError[M, Throwable],
       sleepM: Sleep[M],
       clockM: Clock[M]
@@ -117,7 +125,6 @@ package object retry {
     def withRetry(
       retryPlan: RetryPlan[M]
     )(implicit
-      retryConfig: RetryConfig[M],
       monadErrorM: MonadError[M, Throwable],
       sleepM: Sleep[M],
       clockM: Clock[M]
@@ -131,7 +138,6 @@ package object retry {
     def withRetry(
       retryPlan: RetryPlan[M]
     )(implicit
-      retryConfig: RetryConfig[M],
       monadErrorM: MonadError[M, Throwable],
       sleepM: Sleep[M],
       clockM: Clock[M]
@@ -145,7 +151,6 @@ package object retry {
     def withRetry(
       retryPlan: RetryPlan[M]
     )(implicit
-      retryConfig: RetryConfig[M],
       monadErrorM: MonadError[M, Throwable],
       sleepM: Sleep[M],
       clockM: Clock[M]
@@ -159,7 +164,6 @@ package object retry {
     def withRetry(
       retryPlan: RetryPlan[M]
     )(implicit
-      retryConfig: RetryConfig[M],
       monadErrorM: MonadError[M, Throwable],
       sleepM: Sleep[M],
       clockM: Clock[M]
@@ -173,7 +177,6 @@ package object retry {
     def withRetry(
       retryPlan: RetryPlan[M]
     )(implicit
-      retryConfig: RetryConfig[M],
       monadErrorM: MonadError[M, Throwable],
       sleepM: Sleep[M],
       clockM: Clock[M]
@@ -187,7 +190,6 @@ package object retry {
     def withRetry(
       retryPlan: RetryPlan[M]
     )(implicit
-      retryConfig: RetryConfig[M],
       monadErrorM: MonadError[M, Throwable],
       sleepM: Sleep[M],
       clockM: Clock[M]
@@ -201,7 +203,6 @@ package object retry {
     def withRetry(
       retryPlan: RetryPlan[M]
     )(implicit
-      retryConfig: RetryConfig[M],
       monadErrorM: MonadError[M, Throwable],
       sleepM: Sleep[M],
       clockM: Clock[M]
@@ -209,4 +210,3 @@ package object retry {
       { (a,b,c,d,e,f,g,h,i) => retryPlan(self(a,b,c,d,e,f,g,h,i)) }
   }
 }
-

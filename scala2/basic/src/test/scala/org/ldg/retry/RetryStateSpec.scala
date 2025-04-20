@@ -1,19 +1,18 @@
 package org.ldg.retry
 
+import java.time.Instant
+import scala.concurrent.duration._
 import cats.{Applicative, Id}
 import org.scalatest.Inside
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-
-import java.time.Instant
-import scala.concurrent.duration._
 
 class RetryStateSpec extends AnyFlatSpec with Matchers with Inside {
   class Fixture {
     implicit val now: Instant = Instant.now()
 
     val eventsBuffer = scala.collection.mutable.ListBuffer.empty[RetryEvent]
-    implicit val retryConfig: RetryConfig[Id] = RetryConfig.default[Id]
+    implicit val retryConfig: RetryConfig[Id] = RetryConfig.default[Id]()
       .copy(
         onRetryEvent = { event =>
           eventsBuffer += event
@@ -149,13 +148,13 @@ class RetryStateSpec extends AnyFlatSpec with Matchers with Inside {
     events(0) shouldBe expectedRetryEvent1
   }
 
-  "onRetrySuccess" should "trigger a retry success event if there were retries" in new Fixture {
+  "onAfterAttemptSuccess" should "trigger a retry success event if there were retries" in new Fixture {
     val state0 = RetryState.initial(3, Some(1.minute), correlationId)
     state0.attemptCount shouldBe 0
     val state1 = state0.onBeforeAttempt[Id]
     state1.attemptCount shouldBe 1
     // note: throw away this state since if it "happened" we'd be done
-    state1.onRetrySuccess[Id]()
+    state1.onAfterAttemptSuccess[Id]()
 
     eventsBuffer.result().size shouldBe 0
 
@@ -164,11 +163,22 @@ class RetryStateSpec extends AnyFlatSpec with Matchers with Inside {
     val state3 = state2.onBeforeAttempt[Id]
     state3.attemptCount shouldBe 2
 
-    val state4 = state3.onRetrySuccess[Id]()
+    val state4 = state3.onAfterAttemptSuccess[Id]()
 
     val events = eventsBuffer.result()
     events.size shouldBe 2
     events(1) shouldBe RetryEvent.OnRetrySuccess(state3)
+  }
+
+  it should "emit no events if it succeeded on first attempt" in new Fixture {
+    val state0 = RetryState.initial(3, Some(1.minute), correlationId)
+    state0.attemptCount shouldBe 0
+    val state1 = state0.onBeforeAttempt[Id]
+    state1.attemptCount shouldBe 1
+    state1.onAfterAttemptSuccess[Id]()
+
+    val events = eventsBuffer.result()
+    events.size shouldBe 0
   }
 
   "fmtRetryState" should "format RetryState for logging" in new Fixture {

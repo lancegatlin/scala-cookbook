@@ -1,47 +1,88 @@
 package org.ldg.retry
 
-import cats.effect.kernel.Sync
+import java.io.PrintStream
+import org.slf4j.{ Logger => Slf4jLogger }
+import org.slf4j.event.{ Level => Slf4jLevel }
 import cats.effect.std.Console
-import RetryEvent.{OnAfterFailure, OnRetrySuccess}
-import org.slf4j.Logger
-import org.slf4j.event.Level
+import org.typelevel.log4cats.{ Logger => CatsLogger}
+import org.ldg.effect.CaptureOrRunEffect
+import org.ldg.retry.RetryEvent.{OnAfterFailure, OnRetrySuccess}
 
 object RetryEventHandlers {
-  def retryEventToLogMessage(fmtRetryState: RetryState => String): RetryEvent => (Level, String) = {
+  private lazy val defaultLogger: Slf4jLogger = org.slf4j.LoggerFactory.getLogger("RetryEventHandlers")
+
+  def retryEventToLogMessage(fmtRetryState: RetryState => String): RetryEvent => (Slf4jLevel, String) = {
     case OnAfterFailure(retryState, cause, RetryAction.AttemptAgain(retryDelay)) =>
-      (Level.INFO, s"Retrying failure (${fmtRetryState(retryState)}) after $retryDelay delay: $cause")
+      (Slf4jLevel.INFO, s"Retrying failure (${fmtRetryState(retryState)}) after $retryDelay delay: $cause")
     case OnAfterFailure(retryState, cause, RetryAction.StopRetry(reason))  =>
-      (Level.WARN, s"Retry $reason (${fmtRetryState(retryState)}) rethrowing: $cause")
+      (Slf4jLevel.WARN, s"Retry $reason (${fmtRetryState(retryState)}) rethrowing: $cause")
     case OnRetrySuccess(retryState) =>
-      (Level.INFO, s"Retry success (${fmtRetryState(retryState)})")
+      (Slf4jLevel.INFO, s"Retry success (${fmtRetryState(retryState)})")
   }
 
-  def logByLevel(logger: Logger)(level: Level, msg: String): Unit =
-    level match {
-      case Level.WARN => logger.warn(msg)
-      case Level.ERROR => logger.error(msg)
-      case Level.INFO => logger.info(msg)
-      case Level.DEBUG => logger.debug(msg)
-      case Level.TRACE => logger.trace(msg)
-    }
-
-  def stderrLogEvent[F[_]:Console](
-    logger: Logger,
+  private def errorlnLogging[F[_]](
+    errorln: String => F[Unit],
     fmtRetryState: RetryState => String = RetryState.fmtRetryState
   ): RetryEvent => F[Unit] = { retryEvent =>
     val (level, msg) = retryEventToLogMessage(fmtRetryState)(retryEvent)
-    Console[F].errorln(s"[$level]: $msg")
+      errorln(s"[$level]: $msg")
   }
 
-  def slf4jLogEvent[F[_]:Sync](
-    logger: Logger,
+  def stderrLogging[F[_]:CaptureOrRunEffect](
+    stderr: PrintStream = System.err,
     fmtRetryState: RetryState => String = RetryState.fmtRetryState
   ): RetryEvent => F[Unit] = {
-    val log = logByLevel(logger) _
+    val errorln: String => F[Unit] = msg => CaptureOrRunEffect[F].effect(
+      // scalastyle:off
+      stderr.println(msg)
+      // scalastyle:on
+    )
+    errorlnLogging(errorln, fmtRetryState)
+  }
 
-    { retryEvent: RetryEvent =>
-      val (level, msg) = retryEventToLogMessage(fmtRetryState)(retryEvent)
-      Sync[F].delay(log(level, msg))
+  def catsConsoleLogging[F[_]:Console](
+    fmtRetryState: RetryState => String = RetryState.fmtRetryState
+  ): RetryEvent => F[Unit] =
+    errorlnLogging(
+      msg => Console[F].errorln(msg),
+      fmtRetryState
+    )
+
+  def catsLogging[F[_]:CatsLogger](
+    fmtRetryState: RetryState => String = RetryState.fmtRetryState
+  ): RetryEvent => F[Unit] = { retryEvent =>
+    val maybeThrowable = retryEvent match {
+      case OnAfterFailure(_, cause, _) => Some(cause)
+      case _ => None
+    }
+    val (level, msg) = retryEventToLogMessage(fmtRetryState)(retryEvent)
+    val logger = implicitly[CatsLogger[F]]
+    level match {
+      case Slf4jLevel.ERROR => maybeThrowable.fold(logger.error(msg))(logger.error(_)(msg))
+      case Slf4jLevel.WARN => maybeThrowable.fold(logger.warn(msg))(logger.warn(_)(msg))
+      case Slf4jLevel.INFO => maybeThrowable.fold(logger.info(msg))(logger.info(_)(msg))
+      case Slf4jLevel.DEBUG => maybeThrowable.fold(logger.debug(msg))(logger.debug(_)(msg))
+      case Slf4jLevel.TRACE => maybeThrowable.fold(logger.trace(msg))(logger.trace(_)(msg))
     }
   }
+
+  def slf4jLogEvent[F[_]:CaptureOrRunEffect](
+    logger: Slf4jLogger = defaultLogger,
+    fmtRetryState: RetryState => String = RetryState.fmtRetryState
+  ): RetryEvent => F[Unit] = { retryEvent =>
+      val maybeThrowable = retryEvent match {
+        case OnAfterFailure(_, cause, _) => Some(cause)
+        case _ => None
+      }
+      val (level, msg) = retryEventToLogMessage(fmtRetryState)(retryEvent)
+      CaptureOrRunEffect[F].effect(
+        level match {
+          case Slf4jLevel.ERROR => maybeThrowable.fold(logger.error(msg))(logger.error(msg, _))
+          case Slf4jLevel.WARN => maybeThrowable.fold(logger.warn(msg))(logger.warn(msg, _))
+          case Slf4jLevel.INFO => maybeThrowable.fold(logger.info(msg))(logger.info(msg, _))
+          case Slf4jLevel.DEBUG => maybeThrowable.fold(logger.debug(msg))(logger.debug(msg, _))
+          case Slf4jLevel.TRACE => maybeThrowable.fold(logger.trace(msg))(logger.trace(msg, _))
+        }
+      )
+    }
 }

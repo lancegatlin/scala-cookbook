@@ -164,7 +164,7 @@ object BasicRetry extends LazyLogging {
     startTimeNs: Long,
     maxElapsedTime: Duration,
     lastModifiedNs: Long
- )(implicit
+)(implicit
    retryConfig: RetryConfig
 ) {
     def elapsed: FiniteDuration = (lastModifiedNs - startTimeNs).nanos

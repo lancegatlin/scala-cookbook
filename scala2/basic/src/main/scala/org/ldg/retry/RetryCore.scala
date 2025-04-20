@@ -1,14 +1,13 @@
 package org.ldg.retry
 
-import cats._
-import cats.implicits.toFlatMapOps
-import org.ldg.effect.Sleep
-
 import java.io.FileNotFoundException
 import java.util.UUID
 import scala.concurrent.duration.{Duration, DurationLong, FiniteDuration}
 import scala.util.Random
 import scala.util.control.NonFatal
+import cats._
+import cats.implicits.toFlatMapOps
+import org.ldg.effect.Sleep
 
 /**
  * Utility methods for retrying a function
@@ -125,7 +124,7 @@ object RetryCore {
   )(
     attempt: S => F[Either[Throwable, A]]
   ): F[(S, Either[Throwable, A])] = {
-    def attemptLoop(state0: S ): F[(S, Either[Throwable, A])] =
+    def attemptLoop(state0: S): F[(S, Either[Throwable, A])] =
       onBeforeAttempt(state0)
         .flatMap { state1 =>
           attempt(state1).flatMap {
@@ -143,7 +142,7 @@ object RetryCore {
               }
           }
         }
-    attemptLoop( initialState )
+    attemptLoop(initialState)
   }
 
 }

@@ -92,10 +92,10 @@ object RetryUtils {
   )(implicit
     executionContext: ExecutionContext
   ): Future[(S, Try[A])] = {
-    def attempt(state0: S, executor: Executor ): Future[(S, Try[A])] =
+    def attempt(state0: S, executor: Executor): Future[(S, Try[A])] =
       for {
         state1 <- onBeforeAttempt(state0)
-        tuple <- f( state1 )
+        tuple <- f(state1)
           .transformWith {
             case Success(a) =>
               Future.successful((state1, Success(a)))
@@ -105,7 +105,7 @@ object RetryUtils {
                 tuple <- maybeState2 match {
                   case Some((state2, retryDelay)) =>
                     CompletableFuture.supplyAsync(
-                      () => attempt( state2, executor ),
+                      () => attempt(state2, executor),
                       CompletableFuture.delayedExecutor(
                         retryDelay.toNanos,
                         TimeUnit.NANOSECONDS,
@@ -122,7 +122,7 @@ object RetryUtils {
           }
       } yield tuple
 
-    attempt( initialState, runnable => executionContext.execute(runnable) )
+    attempt(initialState, runnable => executionContext.execute(runnable))
   }
 
 }

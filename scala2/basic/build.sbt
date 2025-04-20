@@ -8,6 +8,8 @@ libraryDependencies ++= Seq(
   "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5",
   "org.typelevel" %% "cats-core" % "2.12.0",
   "org.typelevel" %% "cats-effect" % "3.5.4",
+  "org.typelevel" %% "log4cats-core" % "2.7.0",
+  "org.typelevel" %% "log4cats-slf4j" % "2.7.0",
   "org.apache.commons" % "commons-lang3" % "3.17.0",
 //  "com.typesafe.scala-logging" %% "scala-logging-slf4j" % "2.1.2",
 //  "com.typesafe.scala-logging" %% "scala-logging-api" % "2.1.2",

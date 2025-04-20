@@ -1,12 +1,14 @@
 package org.ldg.retry
 
+import java.util.concurrent.atomic.AtomicInteger
+import scala.concurrent.duration._
+import cats.Applicative
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import java.util.concurrent.atomic.AtomicInteger
-import scala.concurrent.duration._
+import RetryConfig.NoLogging.Implicits._
 
 class RetryPlanSpec extends AnyFlatSpec with Matchers {
 
@@ -14,7 +16,7 @@ class RetryPlanSpec extends AnyFlatSpec with Matchers {
     val attempts = new AtomicInteger(0)
     val retryPlan = RetryPlan[IO](
       maxAttempts = 3,
-      maybeRetryDelay = Some((_, _) => 0.millis),
+      maybePfRetryDelay = Some { case (_, _) => Applicative[IO].pure(0.millis) }
     )
 
     val result = retryPlan.run {
@@ -76,7 +78,7 @@ class RetryPlanSpec extends AnyFlatSpec with Matchers {
   "retry with custom shouldRetry" should "not retry for unretryable exceptions" in {
     var attempts = 0
     val retryPlan = RetryPlan[IO](maxAttempts = 3).shouldRetry {
-      case _: IllegalArgumentException => false
+      case _: IllegalArgumentException => Applicative[IO].pure(false)
     }
 
     val result = retryPlan.run {
@@ -92,7 +94,7 @@ class RetryPlanSpec extends AnyFlatSpec with Matchers {
 
   "retry with custom retry delay" should "apply the specified delay between retries" in {
     var attempts = 0
-    val retryPlan = RetryPlan[IO](maxAttempts = 3).retryDelay((_, _) => 10.millis)
+    val retryPlan = RetryPlan[IO](maxAttempts = 3).calcRetryDelay { case (_, _) => Applicative[IO].pure(10.millis) }
 
     val startTime = System.nanoTime()
     val result = retryPlan.run {
