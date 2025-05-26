@@ -2,23 +2,22 @@ package org.ldg.concurrent
 
 import cats.effect.kernel.Poll
 import FuturePlan._
+import org.ldg.util.AnyTapExt.OrgLdgUtilAnyTapExt
 
+import java.util.concurrent.{CompletableFuture, Executor, TimeUnit}
 import java.util.concurrent.atomic.AtomicBoolean
+import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.jdk.FutureConverters.CompletionStageOps
 import scala.util.{Failure, Success}
 
-case class CancellableEval[A](
-    future: Future[A],
-    cancelEval: () => Unit
-)
-
 trait FuturePlanEval {
-  def apply[A]( plan: FuturePlan[A] )( implicit executionContext: ExecutionContext ): CancellableEval[A]
+  def apply[A]( plan: FuturePlan[A] )( implicit executionContext: ExecutionContext ): FuturePlanCancelableEval[A]
 }
 
 object FuturePlanEval {
   implicit val default: FuturePlanEval = new FuturePlanEval {
-    override def apply[A]( plan: FuturePlan[A] )( implicit executionContext: ExecutionContext ): CancellableEval[A] =
+    override def apply[A]( plan: FuturePlan[A] )( implicit executionContext: ExecutionContext ): FuturePlanCancelableEval[A] =
       defaultEval( plan )
   }
 
@@ -35,8 +34,12 @@ object FuturePlanEval {
     Future.successful( ( current.copy( isCancelled = true ), Left( new CanceledEvalException( "FuturePlan eval canceled" ) ) ) )
 
   // scalastyle:off cyclomatic.complexity method.length
-  def defaultEval[T]( plan: FuturePlan[T] )( implicit executionContext: ExecutionContext ): CancellableEval[T] = {
+  def defaultEval[T]( plan: FuturePlan[T] )( implicit executionContext: ExecutionContext ): FuturePlanCancelableEval[T] = {
     val cancelFlag = new AtomicBoolean( false )
+
+    val sleepDelegateExecutor: Executor = { command =>
+      implicitly[ExecutionContext].execute( command )
+    }
 
     def evalLoop[A](currentState: EvalState, fa: FuturePlan[A] ): Future[( EvalState, Either[Throwable, A] )] = {
       if (currentState.ignoreCancelMaskDepth > 0 || !cancelFlag.get) {
@@ -169,6 +172,33 @@ object FuturePlanEval {
                     canceledEvalResult( currentState )
                   }
               }
+
+          case Sleep( time ) =>
+            CompletableFuture
+              .supplyAsync[Unit](
+                () => (),
+                CompletableFuture.delayedExecutor(
+                  time.toNanos,
+                  TimeUnit.NANOSECONDS,
+                  sleepDelegateExecutor
+                )
+              )
+              .asScala
+              .tap( _.onComplete {
+                case Failure( ex ) =>
+                  implicitly[ExecutionContext].reportFailure(
+                    new RuntimeException( "FuturePlan.sleep unexpected exception", ex )
+                  )
+                case _ =>
+                // do nothing
+              }
+            )
+            .map( _ => ( currentState, Right( () ) ) )
+
+          case Cede =>
+            // yield execution by scheduling a tiny non-zero sleep that will still take some micros to complete
+            evalLoop( currentState, FuturePlan.Sleep( 1.nano ) )
+
         }
       } else {
         canceledEvalResult( currentState )
@@ -180,7 +210,10 @@ object FuturePlanEval {
       case Failure( ex )             => Failure( ex )
     }
 
-    CancellableEval( future, () => cancelFlag.set( true ) )
+    FuturePlanCancelableEval( future, { () =>
+      cancelFlag.set(true)
+      future.transform { _ => Success( () ) } // ignore exceptions here, only completion matters
+    })
   }
   // scalastyle:on cyclomatic.complexity
 

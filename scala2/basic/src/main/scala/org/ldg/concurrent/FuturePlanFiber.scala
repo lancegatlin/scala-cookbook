@@ -1,7 +1,6 @@
 package org.ldg.concurrent
 
 import cats.effect.kernel.{Fiber, Outcome}
-
 import java.util.concurrent.CancellationException
 import java.util.concurrent.atomic.AtomicBoolean
 import scala.concurrent.ExecutionContext
@@ -23,7 +22,7 @@ class FuturePlanFiber[A](
     extends Fiber[FuturePlan, Throwable, A] {
 
   private val isJoined = new AtomicBoolean( false )
-  private lazy val cancellableEval: CancellableEval[A] =
+  private lazy val cancellableEval: FuturePlanCancelableEval[A] =
     eval( fa )
       .tap {
         _.future.onComplete {
@@ -37,10 +36,10 @@ class FuturePlanFiber[A](
         }
       }
 
-  def start(): CancellableEval[A] = cancellableEval
+  def start(): FuturePlanCancelableEval[A] = cancellableEval
 
   override def cancel: FuturePlan[Unit] =
-    FuturePlan.delay( cancellableEval.cancelEval() )
+    FuturePlan.defer( cancellableEval.cancelEval() )
 
   override def join: FuturePlan[Outcome[FuturePlan, Throwable, A]] =
     FuturePlan.defer {

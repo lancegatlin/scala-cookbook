@@ -4,11 +4,8 @@ import cats.effect.kernel.{Fiber, Poll, Sync}
 import cats.effect.{Async, Cont, Ref, Deferred => CatsDeferred}
 import org.ldg.OrgLdgUtilAnyExt
 
-import java.util.concurrent.{CompletableFuture, Executor, TimeUnit}
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.{DurationLong, FiniteDuration}
-import scala.jdk.FutureConverters.CompletionStageOps
-import scala.util.Failure
 
 /**
   * An Async implementation for FuturePlan
@@ -41,10 +38,12 @@ class FuturePlanAsync()(
 
   override def suspend[A]( hint: Sync.Type )( thunk: => A ): FuturePlan[A] =
     hint match {
+      case Sync.Type.Delay =>
+        FuturePlan.delay( thunk )
       case Sync.Type.Blocking =>
         FuturePlan.delay( thunk )( blockingExecutionContext.executionContext )
-      case _ =>
-        FuturePlan.delay( thunk )( implicitly )
+      case Sync.Type.InterruptibleOnce | Sync.Type.InterruptibleMany =>
+        throw new UnsupportedOperationException("Interruptible suspend is not supported in FuturePlanAsync")
     }
 
   override def executionContext: FuturePlan[ExecutionContext] =
@@ -64,37 +63,16 @@ class FuturePlanAsync()(
   override def uncancelable[A]( body: Poll[FuturePlan] => FuturePlan[A] ): FuturePlan[A] =
     FuturePlan.Uncancelable( body )
 
-  override def monotonic: FuturePlan[FiniteDuration] = FuturePlan.pure( System.nanoTime().nanos )
-  override def realTime: FuturePlan[FiniteDuration] = FuturePlan.pure( System.currentTimeMillis().millis )
-
-  private val sleepDelegateExecutor: Executor = { command =>
-    implicitly[ExecutionContext].execute( command )
-  }
+  override def monotonic: FuturePlan[FiniteDuration] =
+    FuturePlan.pure( System.nanoTime().nanos )
+  override def realTime: FuturePlan[FiniteDuration] =
+    FuturePlan.pure( System.currentTimeMillis().millis )
 
   override protected def sleep( time: FiniteDuration ): FuturePlan[Unit] =
-    FuturePlan.defer(
-      CompletableFuture
-        .supplyAsync[Unit](
-          () => (),
-          CompletableFuture.delayedExecutor(
-            time.toNanos,
-            TimeUnit.NANOSECONDS,
-            sleepDelegateExecutor
-          )
-        )
-        .asScala
-        .tap( _.onComplete {
-          case Failure( ex ) =>
-            implicitly[ExecutionContext].reportFailure(
-              new RuntimeException( "FuturePlan.sleep unexpected exception", ex )
-            )
-          case _ =>
-          // do nothing
-        } )
-    )
+    FuturePlan.Sleep( time )
 
   override def cede: FuturePlan[Unit] =
-    sleep( 1.nano )
+    FuturePlan.Cede
 
   override def ref[A]( a: A ): FuturePlan[Ref[FuturePlan, A]] =
     Ref.in( a )( this, this )

@@ -3,6 +3,7 @@ package org.ldg.concurrent
 import cats.effect.Async
 import cats.effect.kernel.Poll
 
+import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
@@ -29,7 +30,7 @@ import scala.util.{Failure, Success, Try}
 sealed trait FuturePlan[A] {
   def run()( implicit executionContext: ExecutionContext, eval: FuturePlanEval ): Future[A] =
     eval( this ).future
-  def eval()( implicit executionContext: ExecutionContext, eval: FuturePlanEval ): CancellableEval[A] =
+  def eval()( implicit executionContext: ExecutionContext, eval: FuturePlanEval ): FuturePlanCancelableEval[A] =
     eval( this )
 
   // note: the `map` and `flatMap` methods here accept ExecutionContext to preserve Future's expected async boundaries
@@ -65,6 +66,8 @@ object FuturePlan {
   final case class ForceR[A, B]( fa: FuturePlan[A], fb: FuturePlan[B] ) extends FuturePlan[B]
   final case class HandleErrorWith[A]( prevStep: FuturePlan[A], f: Throwable => FuturePlan[A] ) extends FuturePlan[A]
   final case class TailRecM[A, B]( a: A, f: A => FuturePlan[Either[A, B]] ) extends FuturePlan[B]
+  final case class Sleep(duration: FiniteDuration) extends FuturePlan[Unit]
+  final case object Cede extends FuturePlan[Unit]
 
   def pure[A]( value: A ): FuturePlan[A] =
     Pure( Right( value ) )
