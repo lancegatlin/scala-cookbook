@@ -6,7 +6,7 @@ import scala.collection.Factory
   * Scala collection extension methods
   */
 object CollectionExt {
-  implicit class CatDigitalIterableExt[A, CC[AA] <: Iterable[AA]]( val self: CC[A] ) extends AnyVal {
+  implicit class OrgLdgIterableExt[A, CC[AA] <: Iterable[AA]](val self: CC[A] ) extends AnyVal {
 
     /**
       * Group elements in a collection into subgroups of sequential elements (i.e. runs) using a custom weight

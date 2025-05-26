@@ -1,0 +1,153 @@
+package org.ldg.concurrent
+
+import cats.effect.implicits.monadCancelOps_
+import cats.effect.kernel.{Outcome, Sync}
+import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
+
+import java.util.concurrent.atomic.AtomicBoolean
+import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, Future}
+
+// note: this spec also fully tests FuturePlanEval and FuturePlanFiber
+class FuturePlanAsyncSpec extends AnyFlatSpec with Matchers with ScalaFutures with BaseFuturePlanSpec {
+
+  "FuturePlanAsync" should "return a pure value" in {
+    F.pure( 42 ).run().futureValue shouldBe 42
+  }
+
+  it should "map a FuturePlan" in {
+    F.map( FuturePlan.defer( Future( 10 ) ) )( _ * 2 ).run().futureValue shouldBe 20
+  }
+
+  it should "flatMap a FuturePlan" in {
+    F.flatMap( FuturePlan.delay( 5 ) )( x => FuturePlan.delay( x + 3 ) ).run().futureValue shouldBe 8
+  }
+
+  it should "correctly handle tail-recursive computations with tailRecM" in {
+    val result = F
+      .tailRecM[Int, Int]( 0 ) { i =>
+        if (i < 5) FuturePlan.delay( Left( i + 1 ) )
+        else FuturePlan.delay( Right( i ) )
+      }.run().futureValue
+
+    result shouldBe 5
+  }
+
+  it should "raise an error with raiseError" in {
+    val result = F.raiseError[Int]( new RuntimeException( "Test Error" ) ).run().failed.futureValue
+    result shouldBe a[RuntimeException]
+    result.getMessage shouldBe "Test Error"
+  }
+
+  it should "handle errors with handleErrorWith" in {
+    val error = FuturePlan.failed[Int]( new RuntimeException( "Error" ) )
+    F.handleErrorWith( error )( _ => FuturePlan.delay( 99 ) ).run().futureValue shouldBe 99
+  }
+
+  it should "suspend a computation" in {
+    F.suspend( Sync.Type.Delay ) {
+        Thread.sleep( 100 ) // simulate some processing time
+        42
+      }.run().futureValue shouldBe 42
+  }
+
+  it should "return the execution context" in {
+    F.executionContext.run().futureValue shouldBe ec
+  }
+
+  it should "provide evalOn to run everything on a single execution context" in {
+    val flag = new AtomicBoolean( false )
+    val customEC = ExecutionContext.fromExecutor { command =>
+      flag.set( true )
+      command.run()
+    }
+    F.evalOn( FuturePlan.delay( 10 ), customEC ).run().futureValue shouldBe 10
+    flag.get() shouldBe true
+  }
+
+  it should "start a fiber" in {
+    val fiber = F.start( FuturePlan.delay( 42 ) ).run().futureValue
+    val Outcome.Succeeded( fa ) = fiber.join.run().futureValue
+    fa.run().futureValue shouldBe 42
+  }
+
+  it should "forceR should ignore failures in first computation but not if CancellationException" in {
+    F.forceR( FuturePlan.failed( new RuntimeException ) )( FuturePlan.delay( 20 ) ).run().futureValue shouldBe 20
+    F.forceR( F.canceled )( FuturePlan.delay( 20 ) ).run().failed.futureValue shouldBe a[CanceledEvalException]
+  }
+
+  it should "return a canceled computation" in {
+    (
+      for {
+        i <- FuturePlan.delay( 42 )
+        _ <- F.canceled // this should cancel the computation
+        result <- F.delay( i * 2 )
+      } yield result
+    ).run().failed.futureValue shouldBe a[CanceledEvalException]
+  }
+
+  it should "handle onCancel" in {
+    val flag = new AtomicBoolean( false )
+
+    (
+      for {
+        i <- FuturePlan.delay( 42 )
+        _ <- F.canceled // this should cancel the computation
+        result <- F.delay( i * 2 )
+      } yield result
+    ).onCancel( FuturePlan.delay( flag.set( true ) ) )
+      .run()
+      .failed
+      .futureValue shouldBe a[CanceledEvalException]
+
+    flag.get() shouldBe true
+  }
+
+  it should "create an uncancelable computation" in {
+    F.uncancelable( _ =>
+        for {
+          result <- FuturePlan.delay( 42 )
+          _ <- F.canceled // this should not cancel the computation
+        } yield result ).run().futureValue shouldBe 42
+  }
+
+  it should "return monotonic time" in {
+    val now = System.nanoTime().nanos
+    F.monotonic.run().futureValue >= now shouldBe true
+  }
+
+  it should "return real time" in {
+    val now = System.currentTimeMillis().millis
+    F.realTime.run().futureValue >= now shouldBe true
+  }
+
+  it should "sleep for a duration" in {
+    val start = System.nanoTime()
+    F.sleep( 100.millis ).run().futureValue
+    val elapsed = (System.nanoTime() - start).nanos
+    elapsed should be >= 100.millis
+  }
+
+  it should "cede execution" in {
+    // not really testable, but we can check it runs without throwing an exception
+    F.cede.run().futureValue shouldBe ()
+  }
+
+  it should "create a Ref" in {
+    val ref = F.ref( 42 ).run().futureValue
+    ref.set( 100 ).run().futureValue
+    ref.get.run().futureValue shouldBe 100
+  }
+
+  it should "create a Deferred" in {
+    val deferred = F.deferred[Int].run().futureValue
+    deferred.complete( 42 ).run().futureValue
+    deferred.get.run().futureValue shouldBe 42
+  }
+
+// todo?
+//  it should "run a continuation" in {
+//  }
+}

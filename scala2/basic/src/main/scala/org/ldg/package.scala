@@ -20,7 +20,7 @@ package object ldg {
       })
   }
 
-  implicit class CatUtilAnyExt[A]( val self: A ) extends AnyVal {
+  implicit class OrgLdgUtilAnyExt[A](val self: A ) extends AnyVal {
 
     /**
       * Run a side-effect on self and return self
