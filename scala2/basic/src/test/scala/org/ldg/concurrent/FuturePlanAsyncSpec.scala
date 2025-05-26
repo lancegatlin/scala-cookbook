@@ -113,6 +113,18 @@ class FuturePlanAsyncSpec extends AnyFlatSpec with Matchers with ScalaFutures wi
         } yield result ).run().futureValue shouldBe 42
   }
 
+  it should "create an uncancelable computation but still allow canceling within a poll" in {
+    val flag = new AtomicBoolean(false)
+    F.uncancelable( poll =>
+      for {
+        result <- FuturePlan.delay( 42 )
+        _ <- F.canceled // this should not cancel the computation
+        _ = flag.set(true)
+        _ <- poll(F.canceled) // this should cancel the computation
+      } yield result ).run().failed.futureValue shouldBe a[CanceledEvalException]
+    flag.get() shouldBe true
+  }
+
   it should "return monotonic time" in {
     val now = System.nanoTime().nanos
     F.monotonic.run().futureValue >= now shouldBe true
