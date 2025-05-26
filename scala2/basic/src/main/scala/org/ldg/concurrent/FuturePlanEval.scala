@@ -76,12 +76,12 @@ object FuturePlanEval {
               def backgroundLoop( current: EvalState, y: Y ): Unit =
                 evalLoop( current, tailRecM.f( y ) )
                   .onComplete {
-                    case Success( ( state, Right( Left( y ) ) ) ) =>
-                      backgroundLoop( state, y )
-                    case Success( ( state, Right( Right( z ) ) ) ) =>
-                      promise.complete( Success( ( state, Right( z ) ) ) )
-                    case Success( ( state, Left( ex ) ) ) =>
-                      promise.complete( Success( ( state, Left( ex ) ) ) )
+                    case Success( ( newState, Right( Left( y ) ) ) ) =>
+                      backgroundLoop( newState, y )
+                    case Success( ( newState, Right( Right( z ) ) ) ) =>
+                      promise.complete( Success( ( newState, Right( z ) ) ) )
+                    case Success( ( newState, Left( ex ) ) ) =>
+                      promise.complete( Success( ( newState, Left( ex ) ) ) )
                     case Failure( ex ) =>
                       promise.complete( Failure( ex ) )
                   }
