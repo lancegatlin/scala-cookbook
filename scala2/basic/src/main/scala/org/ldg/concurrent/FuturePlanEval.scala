@@ -1,7 +1,7 @@
 package org.ldg.concurrent
 
 import cats.effect.kernel.Poll
-import org.ldg.concurrent.FuturePlan._
+import FuturePlan._
 
 import java.util.concurrent.atomic.AtomicBoolean
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -71,9 +71,7 @@ object FuturePlanEval {
           case TailRecM( a, f ) =>
             def evalTailRecM[Y, Z](
                 tailRecM: TailRecM[Y, Z]
-            )(
-                implicit
-                executionContext: ExecutionContext ): Future[( EvalState, Either[Throwable, Z] )] = {
+            ): Future[( EvalState, Either[Throwable, Z] )] = {
               val promise = Promise[( EvalState, Either[Throwable, Z] )]()
               // stack-safe loop that schedules next loop iteration in the execution context
               def backgroundLoop( current: EvalState, y: Y ): Unit =
@@ -148,10 +146,14 @@ object FuturePlanEval {
             }
 
           case Polling( prevStep ) =>
-            if (current.ignoreCancelMaskDepth > 0 && !cancelFlag.get) {
+            if (cancelFlag.get) {
               canceledEvalResult( current )
             } else {
-              evalLoop( current, prevStep )
+              evalLoop( current.copy( ignoreCancelMaskDepth = 0 ), prevStep )
+                .map( {
+                  case ( state, result ) =>
+                    ( state.copy( ignoreCancelMaskDepth = current.ignoreCancelMaskDepth ), result )
+                } )
             }
 
           case ForceR( fa, fb ) =>
