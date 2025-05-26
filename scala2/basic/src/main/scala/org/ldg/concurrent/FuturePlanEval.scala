@@ -73,8 +73,8 @@ object FuturePlanEval {
             def evalTailRecM[Y, Z](tailRecM: TailRecM[Y, Z]): Future[( EvalState, Either[Throwable, Z] )] = {
               val promise = Promise[( EvalState, Either[Throwable, Z] )]()
               // stack-safe loop that schedules next loop iteration in the execution context
-              def backgroundLoop( current: EvalState, y: Y ): Unit =
-                evalLoop( current, tailRecM.f( y ) )
+              def backgroundLoop(currentState: EvalState, y: Y ): Unit =
+                evalLoop( currentState, tailRecM.f( y ) )
                   .onComplete {
                     case Success( ( newState, Right( Left( y ) ) ) ) =>
                       backgroundLoop( newState, y )
