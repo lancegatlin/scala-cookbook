@@ -2,16 +2,16 @@ package org.ldg.concurrent
 
 import cats.effect.implicits.monadCancelOps_
 import cats.effect.kernel.{Outcome, Sync}
-import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 
 // note: this spec also fully tests FuturePlanEval and FuturePlanFiber
-class FuturePlanAsyncSpec extends AnyFlatSpec with Matchers with ScalaFutures with BaseFuturePlanSpec {
+class FuturePlanAsyncSpec extends AnyFlatSpec with Matchers with ScalaFutures with Eventually  with BaseFuturePlanSpec {
 
   "FuturePlanAsync" should "return a pure value" in {
     F.pure( 42 ).run().futureValue shouldBe 42
@@ -90,29 +90,30 @@ class FuturePlanAsyncSpec extends AnyFlatSpec with Matchers with ScalaFutures wi
     plan.run().futureValue shouldBe 84
   }
 
-  // fixme
-//  it should "join a fiber from another fiber and allow canceling that fiber" in {
-//    import cats.effect.implicits.genSpawnOps
-//    val plan = for {
-//      fiber <- FuturePlan.delay {
-//        Thread.sleep( 100 ) // simulate some processing time
-//        42
-//      }
-//        // add a step after the future completes to ensure the fiber checks cancel flag
-//        .map(_ * 2)
-//        .start
-//      _ <- fiber.cancel // cancel the fiber (before the 100 ms sleep finishes)
-//      outcome <- fiber.join
-//      result <- outcome.fold(
-//        FuturePlan.pure(0),
-//        ex => throw ex,
-//        a => a.map(_ * 2)
-//      )
-//    } yield result
-//    plan.run().futureValue shouldBe 0
-//  }
+  it should "join a fiber from another fiber and allow canceling that fiber" in {
+    import cats.effect.implicits.genSpawnOps
 
-  // todo: test that cancel only completes after finalizers all run
+    val plan = for {
+      fiber <- FuturePlan.delay {
+        Thread.sleep( 100 ) // simulate some processing time
+        42
+      }
+        // add a step after the future completes to ensure the fiber checks cancel flag
+        .map { i =>
+          i * 2
+        }
+        .start
+      _ <- fiber.cancel // cancel the fiber (before the 100 ms sleep finishes)
+      outcome <- fiber.join
+      result <- outcome.fold(
+        FuturePlan.pure(0),
+        ex => throw ex,
+        a => a.map(_ * 2)
+      )
+    } yield result
+
+    plan.run().futureValue shouldBe 0
+  }
 
   it should "forceR should ignore failures in first computation but not if CancellationException" in {
     F.forceR( FuturePlan.failed( new RuntimeException ) )( FuturePlan.delay( 20 ) ).run().futureValue shouldBe 20
@@ -120,31 +121,67 @@ class FuturePlanAsyncSpec extends AnyFlatSpec with Matchers with ScalaFutures wi
   }
 
   it should "return a canceled computation" in {
-    (
+    val plan =
       for {
         i <- FuturePlan.delay( 42 )
         _ <- F.canceled // this should cancel the computation
         result <- F.delay( i * 2 )
       } yield result
-    ).run().failed.futureValue shouldBe a[CanceledEvalException]
+
+    plan.run().failed.futureValue shouldBe a[CanceledEvalException]
   }
 
-  it should "handle onCancel" in {
-    val flag = new AtomicBoolean( false )
+  it should "run onCancel finalizers" in {
+    val counter = new AtomicInteger(0)
 
-    (
+    val plan = (
       for {
         i <- FuturePlan.delay( 42 )
+        // should not run this finalizer since its plan isn't canceled
+        i2 <- F.onCancel( FuturePlan.delay( 42 ), FuturePlan.delay( counter.incrementAndGet() ) )
         _ <- F.canceled // this should cancel the computation
-        result <- F.delay( i * 2 )
+        result <- F.delay( i + i2 )
       } yield result
-    ).onCancel( FuturePlan.delay( flag.set( true ) ) )
-      .run()
-      .failed
-      .futureValue shouldBe a[CanceledEvalException]
+    )
+      .onCancel( FuturePlan.delay( counter.incrementAndGet() ) )
+      .onCancel( FuturePlan.delay( counter.incrementAndGet() ) )
 
-    flag.get() shouldBe true
+    plan.run().failed.futureValue shouldBe a[CanceledEvalException]
+    counter.get() shouldBe 2
   }
+
+  it should "future should not complete before all finalizers run" in {
+    val signal = new AtomicBoolean(false)
+    val counter = new AtomicInteger(0)
+
+    val plan = (
+      for {
+        i <- FuturePlan.delay( 42 )
+        // should not run this finalizer since its plan isn't canceled
+        i2 <- F.onCancel( FuturePlan.delay( 42 ), FuturePlan.delay( counter.incrementAndGet() ) )
+        _ <- F.canceled // this should cancel the computation
+        result <- F.delay( i + i2 )
+      } yield result
+      )
+      .onCancel( FuturePlan.delay( counter.incrementAndGet() ) )
+      .onCancel(FuturePlan.delay {
+        while( !signal.get() ) { // simulate some processing time
+          Thread.sleep( 1 )
+        }
+        counter.incrementAndGet()
+      })
+
+    val future = plan.run()
+    future.isCompleted shouldBe false
+    eventually {
+      counter.get() shouldBe 1
+    }
+    counter.get() shouldBe 1
+    signal.set(true)
+    future.failed.futureValue shouldBe a[CanceledEvalException]
+    counter.get() shouldBe 2
+  }
+
 
   it should "create an uncancelable computation" in {
     F.uncancelable( _ =>
@@ -200,7 +237,7 @@ class FuturePlanAsyncSpec extends AnyFlatSpec with Matchers with ScalaFutures wi
     deferred.get.run().futureValue shouldBe 42
   }
 
-// todo?
+// maybe-do?
 //  it should "run a continuation" in {
 //  }
 }

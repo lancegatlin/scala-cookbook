@@ -1,6 +1,6 @@
 package org.ldg.concurrent
 
-import cats.effect.Async
+import cats.effect.{Async, IO}
 import cats.effect.kernel.Poll
 
 import scala.concurrent.duration.FiniteDuration
@@ -61,7 +61,7 @@ object FuturePlan {
   final case class Deferred[A]( runFuture: () => Future[A] ) extends FuturePlan[A]
   final case class Uncancelable[A]( body: Poll[FuturePlan] => FuturePlan[A] ) extends FuturePlan[A]
   final case class OnCancel[A]( prevStep: FuturePlan[A], fin: FuturePlan[Unit] ) extends FuturePlan[A]
-  final case class Canceled() extends FuturePlan[Unit]
+  final case object Canceled extends FuturePlan[Unit]
   final case class Polling[A]( prevStep: FuturePlan[A] ) extends FuturePlan[A]
   final case class ForceR[A, B]( fa: FuturePlan[A], fb: FuturePlan[B] ) extends FuturePlan[B]
   final case class HandleErrorWith[A]( prevStep: FuturePlan[A], f: Throwable => FuturePlan[A] ) extends FuturePlan[A]
@@ -85,6 +85,12 @@ object FuturePlan {
       case Right( v ) => FuturePlan.pure( v )
       case Left( ex ) => FuturePlan.failed( ex )
     }
+  def canceled: FuturePlan[Unit] =
+    Canceled
+  def sleep(duration: FiniteDuration): FuturePlan[Unit] =
+    Sleep(duration)
+  def cede: FuturePlan[Unit] =
+    Cede
 
   /**
     * Creates a FuturePlan that will run the provided code block when evaluated.
@@ -133,6 +139,10 @@ object FuturePlan {
         )
       case _ => fa
     }
+
+  val poll: Poll[FuturePlan] = new Poll[FuturePlan] {
+    override def apply[T]( fa: FuturePlan[T] ): FuturePlan[T] = Polling( fa )
+  }
 
   object Implicits {
     implicit def asyncForFuturePlan(

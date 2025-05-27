@@ -1,12 +1,12 @@
 package org.ldg.concurrent
 
 import cats.effect.kernel.Poll
-import FuturePlan._
+import cats.implicits.{catsSyntaxApplyOps, toFlatMapOps}
+import org.ldg.concurrent.FuturePlan._
 import org.ldg.util.AnyTapExt.OrgLdgUtilAnyTapExt
 
-import java.util.concurrent.{CompletableFuture, Executor, TimeUnit}
 import java.util.concurrent.atomic.AtomicBoolean
-import scala.concurrent.duration.DurationInt
+import java.util.concurrent.{CompletableFuture, TimeUnit}
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.jdk.FutureConverters.CompletionStageOps
 import scala.util.{Failure, Success}
@@ -18,203 +18,272 @@ trait FuturePlanEval {
 object FuturePlanEval {
   implicit val default: FuturePlanEval = new FuturePlanEval {
     override def apply[A]( plan: FuturePlan[A] )( implicit executionContext: ExecutionContext ): FuturePlanCancelableEval[A] =
-      defaultEval( plan )
+      eval( plan )
   }
 
   private val poll = new Poll[FuturePlan] {
     override def apply[T]( fa: FuturePlan[T] ): FuturePlan[T] = Polling( fa )
   }
 
-  case class EvalState(
-      ignoreCancelMaskDepth: Int = 0,
-      isCancelled: Boolean = false
+  private case class EvalState(
+    ignoreCancelMaskDepth: Int,
+    cancelFlag: AtomicBoolean
   )
 
-  private def canceledEvalResult( current: EvalState ): Future[( EvalState, Left[CanceledEvalException, Nothing] )] =
-    Future.successful( ( current.copy( isCancelled = true ), Left( new CanceledEvalException( "FuturePlan eval canceled" ) ) ) )
+  private val canceledEvalException = new CanceledEvalException( "FuturePlan eval canceled" )
 
-  // scalastyle:off cyclomatic.complexity method.length
-  def defaultEval[T]( plan: FuturePlan[T] )( implicit executionContext: ExecutionContext ): FuturePlanCancelableEval[T] = {
-    val cancelFlag = new AtomicBoolean( false )
+  def eval[T](plan: FuturePlan[T] )(implicit executionContext: ExecutionContext ): FuturePlanCancelableEval[T] = {
+    val cancelFlag = new AtomicBoolean(false)
+    val state = EvalState(0, cancelFlag)
 
-    val sleepDelegateExecutor: Executor = { command =>
-      implicitly[ExecutionContext].execute( command )
-    }
-
-    def evalLoop[A](currentState: EvalState, fa: FuturePlan[A] ): Future[( EvalState, Either[Throwable, A] )] = {
-      if (currentState.ignoreCancelMaskDepth > 0 || !cancelFlag.get) {
-        fa match {
-          case Pure( value ) =>
-            Future.successful( ( currentState, value ) )
-
-          case Map( prevStep, f, boundExecutionContext ) =>
-            evalLoop( currentState, prevStep )
-              .map {
-                case ( newState, result ) =>
-                  ( newState, result.map( f ) )
-              }( boundExecutionContext )
-
-          case FlatMap( prevStep, f, boundExecutionContext ) =>
-            evalLoop( currentState, prevStep )
-              .flatMap {
-                case ( newState, Right( value ) ) =>
-                  evalLoop( newState, f( value ) )
-                case ( newState, Left( ex ) ) => Future.successful( ( newState, Left( ex ) ) )
-              }( boundExecutionContext )
-
-          case HandleErrorWith( prevStep, f ) =>
-            evalLoop( currentState, prevStep )
-              .transformWith {
-                case Success( ( newState, Left( ex ) ) ) =>
-                  evalLoop( newState, f( ex ) )
-                case success @ Success( _ ) =>
-                  Future.fromTry( success )
-                case Failure( ex ) => Future.failed( ex )
-              }
-
-          case tailRecM@TailRecM( _, _ ) =>
-            def evalTailRecM[Y, Z](tailRecM: TailRecM[Y, Z]): Future[( EvalState, Either[Throwable, Z] )] = {
-              val promise = Promise[( EvalState, Either[Throwable, Z] )]()
-              // stack-safe loop that schedules next loop iteration in the execution context
-              def backgroundLoop(currentState: EvalState, y: Y ): Unit =
-                evalLoop( currentState, tailRecM.f( y ) )
-                  .onComplete {
-                    case Success( ( newState, Right( Left( y ) ) ) ) =>
-                      backgroundLoop( newState, y )
-                    case Success( ( newState, Right( Right( z ) ) ) ) =>
-                      promise.complete( Success( ( newState, Right( z ) ) ) )
-                    case Success( ( newState, Left( ex ) ) ) =>
-                      promise.complete( Success( ( newState, Left( ex ) ) ) )
-                    case Failure( ex ) =>
-                      promise.complete( Failure( ex ) )
-                  }
-
-              backgroundLoop( currentState, tailRecM.a )
-              promise.future
-            }
-
-            evalTailRecM( tailRecM )
-
-          case Delayed( thunk, boundExecutionContext ) =>
-            Future( thunk() )( boundExecutionContext ).transform {
-              case Success( a )  => Success( ( currentState, Right( a ) ) )
-              case Failure( ex ) => Success( ( currentState, Left( ex ) ) )
-            }
-
-          case Deferred( runFuture ) =>
-            runFuture().transform {
-              case Success( a )  => Success( ( currentState, Right( a ) ) )
-              case Failure( ex ) => Success( ( currentState, Left( ex ) ) )
-            }
-
-          case Uncancelable( body ) =>
-            evalLoop(
-              currentState.copy(
-                ignoreCancelMaskDepth = currentState.ignoreCancelMaskDepth + 1
-              ),
-              body( poll )
-            ).map {
-              case ( newState, b ) =>
-                ( newState.copy( ignoreCancelMaskDepth = newState.ignoreCancelMaskDepth - 1 ), b )
-            }
-
-          case OnCancel( prevStep, fin ) =>
-            evalLoop( currentState, prevStep )
-              .flatMap {
-                case tuple @ ( newState, prevStepEvalResult ) =>
-                  if (newState.isCancelled) {
-                    // evaluation of finalizers can't be cancelled
-                    evalLoop( EvalState( ignoreCancelMaskDepth = 1 ), fin )
-                      .andThen {
-                        case Success( ( _, Left( ex ) ) ) =>
-                          executionContext.reportFailure(
-                            new RuntimeException(
-                              "FuturePlan.eval unexpected exception during finalizer",
-                              ex
-                            ) )
-                      }
-                      // errors in finalizers are suppressed/discarded
-                      .map { case ( newState, _ ) => ( newState, prevStepEvalResult ) }
-                  } else {
-                    Future.successful( tuple )
-                  }
-              }
-
-          case Canceled() =>
-            if (currentState.ignoreCancelMaskDepth == 0) {
-              canceledEvalResult( currentState )
-            } else {
-              Future.successful( ( currentState, Right( () ) ) )
-            }
-
-          case Polling( prevStep ) =>
-            if (cancelFlag.get) {
-              canceledEvalResult( currentState )
-            } else {
-              // reset ignoreCancelMaskDepth to 0 for polling (to allow canceling)
-              evalLoop( currentState.copy( ignoreCancelMaskDepth = 0 ), prevStep )
-                .map( {
-                  case ( newState, result ) =>
-                    // restore ignoreCancelMaskDepth after polling
-                    ( newState.copy( ignoreCancelMaskDepth = currentState.ignoreCancelMaskDepth ), result )
-                } )
-            }
-
-          case ForceR( fa, fb ) =>
-            evalLoop( currentState, fa )
-              .flatMap {
-                case ( newState, _ ) =>
-                  // short-circuit fb only if fa cancelled (even ignore fa errors)
-                  // maybe-do: not sure if should report unhandled fa errors? seems like design of forceR is to ignore them?
-                  if (!newState.isCancelled) {
-                    evalLoop( currentState, fb )
-                  } else {
-                    canceledEvalResult( currentState )
-                  }
-              }
-
-          case Sleep( time ) =>
-            CompletableFuture
-              .supplyAsync[Unit](
-                () => (),
-                CompletableFuture.delayedExecutor(
-                  time.toNanos,
-                  TimeUnit.NANOSECONDS,
-                  sleepDelegateExecutor
-                )
-              )
-              .asScala
-              .tap( _.onComplete {
-                case Failure( ex ) =>
-                  implicitly[ExecutionContext].reportFailure(
-                    new RuntimeException( "FuturePlan.sleep unexpected exception", ex )
-                  )
-                case _ =>
-                // do nothing
-              }
-            )
-            .map( _ => ( currentState, Right( () ) ) )
-
-          case Cede =>
-            // yield execution by scheduling a tiny non-zero sleep that will still take some micros to complete
-            evalLoop( currentState, FuturePlan.Sleep( 1.nano ) )
-
-        }
-      } else {
-        canceledEvalResult( currentState )
-      }
-    }
-    val future = evalLoop( EvalState(), plan ).map( _._2 ).transform {
+    val future = evalStep( state, plan ).map( _._2 ).transform {
       case Success( Right( value ) ) => Success( value )
       case Success( Left( ex ) )     => Failure( ex )
       case Failure( ex )             => Failure( ex )
     }
 
-    FuturePlanCancelableEval( future, { () =>
-      cancelFlag.set(true)
-      future.transform { _ => Success( () ) } // ignore exceptions here, only completion matters
-    })
+    FuturePlanCancelableEval(
+      future,
+      { () =>
+        cancelFlag.set(true)
+        future.transformWith { _ => Future.successful( () ) } // ignore exceptions here, only completion matters
+      }
+    )
   }
-  // scalastyle:on cyclomatic.complexity
 
+  private def checkCancelFlag(
+    state: EvalState,
+    fa: FuturePlan[_]
+  )(implicit executionContext: ExecutionContext) : Future[Unit] =
+   // use Future here to ensure cancellation check happens at runtime just before evaluating each step of the FuturePlan
+    Future.unit.flatMap { _ =>
+      if (state.ignoreCancelMaskDepth == 0 && state.cancelFlag.get) {
+        // note: failed Future here will short-circuit all further eval/Future.transforms (e.g. map/flatMap) except for
+        // onCancel finalizers which use Future.transformWith (also evalTailRecM which uses onComplete but it ends its
+        // loop early by propagating Future.failed)
+        Future.failed(canceledEvalException)
+      } else {
+        Future.unit
+      }
+    }
+
+  private def evalStep[A](
+    // when recursing on previous step (e.g. Map, OnCancel, etc), state0 is the initial state of the chain of linked
+    // FuturePlans (eval time)
+    // however, when recursing during runtime (e.g. FlatMap, TailRecM, etc), state0 is the runtime state at the time the
+    // new FuturePlan chain was created
+    // also, for Uncancelable or Polling, state0 is used to modify state0.ignoreCancelMaskDepth for their previous steps
+    // and later restored during runtime after completion of previous steps
+    state0: EvalState,
+    fa: FuturePlan[A]
+  )(implicit
+    executionContext: ExecutionContext
+  ): Future[( EvalState, Either[Throwable, A] )] = {
+    // evaluate terminal steps which have no previous step (i.e. Pure, Delayed, Deferred) with cancel flag check
+    // before evaluating the step
+    def evalTerminalStep[T](
+      createStepFuture: => Future[( EvalState, Either[Throwable, T] )]
+    ): Future[( EvalState, Either[Throwable, T] )] =
+      checkCancelFlag(state0, fa) *>
+      createStepFuture
+
+    // when recursing on previous step, check cancel flag after building the Future for the previous step to ensure
+    // we use the runtime state of the previous step (and not state0)
+    def evalPrevStep[T](state: EvalState, fa: FuturePlan[T]): Future[( EvalState, Either[Throwable, T] )] =
+      evalStep(state, fa)
+        .flatTap { case ( runtimeState, _ ) =>
+          checkCancelFlag(runtimeState, fa)
+        }
+
+    fa match {
+      case Pure( value ) =>
+        evalTerminalStep {
+          Future.successful( ( state0, value ) )
+        }
+
+      case Delayed( thunk, boundExecutionContext ) =>
+        evalTerminalStep {
+          Future( thunk() )( boundExecutionContext )
+            .transform {
+              case Success( a )  => Success( ( state0, Right( a ) ) )
+              case Failure( ex ) => Success( ( state0, Left( ex ) ) )
+            }
+        }
+
+      case Deferred( runFuture ) =>
+        evalTerminalStep {
+          runFuture()
+            .transform {
+              case Success( a )  => Success( ( state0, Right( a ) ) )
+              case Failure( ex ) => Success( ( state0, Left( ex ) ) )
+            }
+        }
+
+      case Map( prevStep, f, boundExecutionContext ) =>
+        evalPrevStep( state0, prevStep )
+          .map {
+            case ( runtimeState, result ) =>
+              ( runtimeState, result.map( f ) )
+          }( boundExecutionContext )
+
+      // steps with runtime recursion
+
+      case FlatMap( prevStep, f, boundExecutionContext ) =>
+        evalPrevStep( state0, prevStep )
+          .flatMap {
+            case ( runtimeState, Right( value ) ) =>
+              evalStep( runtimeState, f( value ) )
+            case ( newState, Left( ex ) ) =>
+              Future.successful( ( newState, Left( ex ) ) )
+          }( boundExecutionContext )
+
+      case HandleErrorWith( prevStep, f ) =>
+        evalPrevStep( state0, prevStep )
+          .flatMap {
+            case ( runtimeState, Left( ex ) )=>
+              evalStep( runtimeState, f( ex ) )
+            case other => Future.successful(other)
+          }
+
+      case ForceR( fa, fb ) =>
+        evalPrevStep( state0, fa )
+          // short-circuit fb only if fa canceled (even ignore fa errors)
+          // Future will short circuit flatMap if fa is completed with a CancelEvalException failure
+          .flatMap { _ =>
+            // throw away fa success or failure, only fb matters
+            // maybe-do: not sure if should report unhandled fa errors? seems like design of forceR is to ignore them?
+            evalStep( state0, fb )
+          }
+
+      case tailRecM@TailRecM( _, _ ) =>
+        evalTerminalStep {
+          evalTailRecM( state0,tailRecM )
+        }
+
+      // cancellation
+      case Uncancelable( body ) =>
+        evalPrevStep(state0.copy(ignoreCancelMaskDepth = state0.ignoreCancelMaskDepth + 1), body( poll ))
+          .map { case ( runtimeState, b ) =>
+            ( runtimeState.copy( ignoreCancelMaskDepth = runtimeState.ignoreCancelMaskDepth - 1 ), b )
+          }
+
+      case OnCancel( prevStep, fin ) =>
+        // maybe-do: accumulate finalizers in a runtime list and on cancel run them that way
+        evalPrevStep( state0, prevStep )
+          // note: can't AndThen here since we want to confirm all finalizers ran by propagation of CanceledEvalException
+          // all the way to final future (bottom of evalLoop below)
+          .transformWith {
+            case Failure(ex:CanceledEvalException) =>
+              evalFinalizer( state0, ex, fin )
+            case other =>
+              Future.fromTry(other)
+          }
+
+      case Canceled =>
+        // note: no need to check cancelFlag here since we are canceling the FuturePlan eval
+        // note: ok for this to run immediately since it will be running in caller's Future
+        if (state0.ignoreCancelMaskDepth == 0) {
+          Future.failed(canceledEvalException)
+        } else {
+          Future.successful( ( state0, Right( () ) ) )
+        }
+
+      case Polling( prevStep ) =>
+        // reset ignoreCancelMaskDepth to 0 for polling (to allow canceling)
+        // note: evalLoop will take care of first checking cancelFlag before eval of prevStep
+        evalPrevStep( state0.copy( ignoreCancelMaskDepth = 0 ), prevStep )
+          .map {
+            case ( runtimeState, result ) =>
+              // restore ignoreCancelMaskDepth after polling
+              ( runtimeState.copy( ignoreCancelMaskDepth = state0.ignoreCancelMaskDepth ), result )
+          }
+
+      case sleep@Sleep( _ ) =>
+        evalTerminalStep {
+          evalSleep(state0, sleep)
+        }
+
+      case Cede =>
+        // yield execution by scheduling a callback which take a few micros to complete
+        evalTerminalStep {
+          Future( ( state0, Right( () ) ) )
+        }
+
+    }
+  }
+
+  private  def evalTailRecM[Y, Z](
+    state: EvalState,
+    tailRecM: TailRecM[Y, Z]
+  )(implicit
+    executionContext: ExecutionContext
+  ): Future[( EvalState, Either[Throwable, Z] )] = {
+    val promise = Promise[( EvalState, Either[Throwable, Z] )]()
+    // stack-safe loop that schedules next loop iteration in the execution context
+    def backgroundLoop(state: EvalState, y: Y ): Unit =
+      // note: not checking cancelFlag here since each evalStep call will check it
+      evalStep( state, tailRecM.f( y ) )
+        .onComplete {
+          case Success( ( runtimeState, Right( Left( y ) ) ) ) =>
+            backgroundLoop( runtimeState, y )
+          case Success( ( runtimeState, Right( Right( z ) ) ) ) =>
+            promise.complete( Success( ( runtimeState, Right( z ) ) ) )
+          case Success( ( runtimeState, Left( ex ) ) ) =>
+            promise.complete( Success( ( runtimeState, Left( ex ) ) ) )
+          case Failure( ex ) =>
+            promise.complete( Failure( ex ) )
+        }
+
+    backgroundLoop( state, tailRecM.a )
+    promise.future
+  }
+
+  private def evalFinalizer[A](
+     state: EvalState,
+     ex: CanceledEvalException,
+     fin: FuturePlan[Unit]
+   )(implicit
+     executionContext: ExecutionContext
+   ): Future[( EvalState, Either[Throwable, A] )] =
+    // evaluation of finalizers can't be cancelled
+    evalStep( state.copy( ignoreCancelMaskDepth = 1 ), fin )
+      .andThen {
+        case Success( ( _, Left( ex ) ) ) =>
+          executionContext.reportFailure(
+            new RuntimeException(
+              "FuturePlan.eval unexpected exception during finalizer",
+              ex
+            ) )
+      }
+      // errors in finalizers are reported & discarded
+      .transformWith { _ => Future.failed(ex) }
+
+  private def evalSleep(
+    state: EvalState,
+    sleep: Sleep
+  )(implicit
+    executionContext: ExecutionContext
+  ): Future[( EvalState, Either[Throwable, Unit] )] = {
+    // maybe-do: sleep could also check cancel flag at some interval?
+    CompletableFuture
+      .supplyAsync[Unit](
+        () => (),
+        CompletableFuture.delayedExecutor(
+          sleep.duration.toNanos,
+          TimeUnit.NANOSECONDS,
+          executionContext.execute
+        )
+      )
+      .asScala
+      .tap( _.onComplete {
+        case Failure( ex ) =>
+          executionContext.reportFailure(
+            new RuntimeException( "FuturePlan.sleep unexpected exception", ex )
+          )
+        case _ =>
+          // do nothing
+      }
+    )
+    .map( _ => ( state, Right( () ) ) )
+  }
 }

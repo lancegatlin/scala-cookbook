@@ -8,7 +8,7 @@ import scala.concurrent.Future
   * @param future the running Future which completes with the result of the FuturePlan evaluation (the value,
   *               an exception or CanceledEvalException if canceled).
   * @param cancelEval a function that cancels the evaluation of the FuturePlan. The returned future never fails and
-  *                   completes only after all finalizers are evaluated.
+  *                   completes only after all finalizers complete.
   * @tparam A the type of the result of the FuturePlan
   */
   case class FuturePlanCancelableEval[A](

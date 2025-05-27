@@ -57,7 +57,7 @@ class FuturePlanAsync()(
   override def forceR[A, B]( fa: FuturePlan[A] )( fb: FuturePlan[B] ): FuturePlan[B] =
     FuturePlan.ForceR( fa, fb )
   override def canceled: FuturePlan[Unit] =
-    FuturePlan.Canceled()
+    FuturePlan.Canceled
   override def onCancel[A]( fa: FuturePlan[A], fin: FuturePlan[Unit] ): FuturePlan[A] =
     FuturePlan.OnCancel( fa, fin )
   override def uncancelable[A]( body: Poll[FuturePlan] => FuturePlan[A] ): FuturePlan[A] =
