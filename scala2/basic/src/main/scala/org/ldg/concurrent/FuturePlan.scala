@@ -87,6 +87,9 @@ object FuturePlan {
     }
   def canceled: FuturePlan[Unit] =
     Canceled
+  val poll: Poll[FuturePlan] = new Poll[FuturePlan] {
+    override def apply[T]( fa: FuturePlan[T] ): FuturePlan[T] = Polling( fa )
+  }
   def sleep(duration: FiniteDuration): FuturePlan[Unit] =
     Sleep(duration)
   def cede: FuturePlan[Unit] =
@@ -139,10 +142,6 @@ object FuturePlan {
         )
       case _ => fa
     }
-
-  val poll: Poll[FuturePlan] = new Poll[FuturePlan] {
-    override def apply[T]( fa: FuturePlan[T] ): FuturePlan[T] = Polling( fa )
-  }
 
   object Implicits {
     implicit def asyncForFuturePlan(

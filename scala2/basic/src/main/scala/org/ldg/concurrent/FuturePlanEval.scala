@@ -21,10 +21,6 @@ object FuturePlanEval {
       eval( plan )
   }
 
-  private val poll = new Poll[FuturePlan] {
-    override def apply[T]( fa: FuturePlan[T] ): FuturePlan[T] = Polling( fa )
-  }
-
   private case class EvalState(
     ignoreCancelMaskDepth: Int,
     cancelFlag: AtomicBoolean
