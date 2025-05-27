@@ -1,7 +1,9 @@
 package org.ldg.concurrent
 
+import cats.effect.Async
 import cats.effect.implicits.monadCancelOps_
 import cats.effect.kernel.{Outcome, Sync}
+import org.ldg.concurrent.ExecutionContextExt.OrgLdgConcurrentExecutionExt
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -73,11 +75,26 @@ class FuturePlanAsyncSpec extends AnyFlatSpec with Matchers with ScalaFutures wi
     fa.run().futureValue shouldBe 42
   }
 
+  it should "cancel a fiber" in {
+    val fiber = F.start(
+      FuturePlan.delay {
+        Thread.sleep(50) // simulate some processing time
+        42
+      }
+        .map(_ * 2)
+    ).run().futureValue
+
+    (for {
+      _ <- fiber.cancel
+      result <- fiber.join
+    } yield result).run().futureValue shouldBe Outcome.Canceled()
+  }
+
   it should "join a fiber from another fiber" in {
     import cats.effect.implicits.genSpawnOps
     val plan = for {
       fiber <- FuturePlan.delay {
-        Thread.sleep( 100 ) // simulate some processing time
+        Thread.sleep( 50 ) // simulate some processing time
         42
       }.start
       outcome <- fiber.join
@@ -93,6 +110,7 @@ class FuturePlanAsyncSpec extends AnyFlatSpec with Matchers with ScalaFutures wi
   it should "join a fiber from another fiber and allow canceling that fiber" in {
     import cats.effect.implicits.genSpawnOps
 
+    // maybe-do: turn off reporting unhandled exceptions for this test which intermittently detects fiber join late
     val plan = for {
       fiber <- FuturePlan.delay {
         Thread.sleep( 100 ) // simulate some processing time
@@ -115,6 +133,27 @@ class FuturePlanAsyncSpec extends AnyFlatSpec with Matchers with ScalaFutures wi
     plan.run().futureValue shouldBe 0
   }
 
+  it should "report an unhandled exception from a failed fiber that is never joined" in {
+    import cats.effect.implicits.genSpawnOps
+    val counter = new AtomicInteger(0)
+    implicit val ec: ExecutionContext = ExecutionContext.global.withUnhandledExceptionHandler { _ =>
+      counter.incrementAndGet()
+    }
+    implicit val bec: BlockingExecutionContext = BlockingExecutionContext(ec)
+    implicit val F: Async[FuturePlan] = new FuturePlanAsync(
+      FuturePlanAsync.Config(FuturePlanFiber.Config(
+        maybeFailureJoinTimeout = Some(1.millis)
+      ))
+    )
+
+    val fiber = FuturePlan.delay {
+      throw new RuntimeException( "Fiber failed" )
+    }.start.run().futureValue
+    Thread.sleep(50) // give the fiber some time to detect there was never a join call
+    counter.get() shouldBe 1 // should have reported the unhandled exception
+    fiber.join.run().futureValue shouldBe a[Outcome.Errored[FuturePlan,_,_]]
+  }
+
   it should "forceR should ignore failures in first computation but not if CancellationException" in {
     F.forceR( FuturePlan.failed( new RuntimeException ) )( FuturePlan.delay( 20 ) ).run().futureValue shouldBe 20
     F.forceR( F.canceled )( FuturePlan.delay( 20 ) ).run().failed.futureValue shouldBe a[CanceledEvalException]
@@ -128,7 +167,9 @@ class FuturePlanAsyncSpec extends AnyFlatSpec with Matchers with ScalaFutures wi
         result <- F.delay( i * 2 )
       } yield result
 
-    plan.run().failed.futureValue shouldBe a[CanceledEvalException]
+    val result = plan.run().failed.futureValue
+    result shouldBe a[CanceledEvalException]
+    result.getMessage shouldBe "FuturePlanEval evaluated FuturePlan.canceled"
   }
 
   it should "run onCancel finalizers" in {

@@ -15,9 +15,12 @@ import scala.concurrent.duration.{DurationLong, FiniteDuration}
   *
   * @param executionContext the execution context to run FuturePlan computations that aren't bound by specific
   *                         FutureMap.map/flatMap calls
+  * @param config the configuration for FuturePlanAsync
   * @param blockingExecutionContext the execution context to run blocking computations
   */
-class FuturePlanAsync()(
+class FuturePlanAsync(
+  config: FuturePlanAsync.Config = FuturePlanAsync.defaultConfig
+)(
     implicit
     executionContext: ExecutionContext,
     blockingExecutionContext: BlockingExecutionContext )
@@ -52,7 +55,7 @@ class FuturePlanAsync()(
     FuturePlan.evalOn( fa, ec )
 
   override def start[A]( fa: FuturePlan[A] ): FuturePlan[Fiber[FuturePlan, Throwable, A]] =
-    FuturePlan.delay( new FuturePlanFiber[A]( fa ).tap( _.start() ) )
+    FuturePlan.delay( new FuturePlanFiber[A]( fa, config.futurePlanFiberConfig ).tap( _.start() ) )
 
   override def forceR[A, B]( fa: FuturePlan[A] )( fb: FuturePlan[B] ): FuturePlan[B] =
     FuturePlan.ForceR( fa, fb )
@@ -80,4 +83,13 @@ class FuturePlanAsync()(
     CatsDeferred.in( this, this )
   override def cont[K, R]( body: Cont[FuturePlan, K, R] ): FuturePlan[R] =
     Async.defaultCont( body )( this )
+}
+
+object FuturePlanAsync {
+  case class Config(
+    futurePlanFiberConfig: FuturePlanFiber.Config
+  )
+  val defaultConfig: Config = Config(
+    futurePlanFiberConfig = FuturePlanFiber.defaultConfig
+  )
 }

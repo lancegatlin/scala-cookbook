@@ -1,6 +1,5 @@
 package org.ldg.concurrent
 
-import cats.effect.kernel.Poll
 import cats.implicits.{catsSyntaxApplyOps, toFlatMapOps}
 import org.ldg.concurrent.FuturePlan._
 import org.ldg.util.AnyTapExt.OrgLdgUtilAnyTapExt
@@ -26,8 +25,22 @@ object FuturePlanEval {
     cancelFlag: AtomicBoolean
   )
 
-  private val canceledEvalException = new CanceledEvalException( "FuturePlan eval canceled" )
+  /*
+    there are three phases ("times") of FuturePlan evaluation to consider when reviewing the eval method:
 
+      1. "eval time": the time when a reified FuturePlan chain/list is constructed and walked in reverse order until a
+      terminal step is reached which has no previous step (i.e. Pure, Delayed, Deferred). This step then is evaluated
+      into a base Future which checks the cancel flag before evaluating the step.
+
+      2. "runtime": the background execution of the base Future and the stacking/execution of Future callbacks onto the
+      base Future. The base Future and each Future callback pass EvalState to the next step. Each Future callback checks
+      the cancel flag before evaluating the step.
+
+      3. "recursive eval runtime": the time when a new FuturePlan is created at runtime (e.g. FlatMap, TailRecM, etc)
+      and is then recursively evaluated by calling evalStep. This is similar to eval time, but the state passed to the
+      first step of the new FuturePlan chain/list is the last runtime state of the previous chain/list, not the initial
+      state of the outer chain/list.
+   */
   def eval[T](plan: FuturePlan[T] )(implicit executionContext: ExecutionContext ): FuturePlanCancelableEval[T] = {
     val cancelFlag = new AtomicBoolean(false)
     val state = EvalState(0, cancelFlag)
@@ -47,17 +60,14 @@ object FuturePlanEval {
     )
   }
 
-  private def checkCancelFlag(
-    state: EvalState,
-    fa: FuturePlan[_]
-  )(implicit executionContext: ExecutionContext) : Future[Unit] =
+  private def checkCancelFlag(state: EvalState)(implicit executionContext: ExecutionContext) : Future[Unit] =
    // use Future here to ensure cancellation check happens at runtime just before evaluating each step of the FuturePlan
     Future.unit.flatMap { _ =>
       if (state.ignoreCancelMaskDepth == 0 && state.cancelFlag.get) {
         // note: failed Future here will short-circuit all further eval/Future.transforms (e.g. map/flatMap) except for
         // onCancel finalizers which use Future.transformWith (also evalTailRecM which uses onComplete but it ends its
         // loop early by propagating Future.failed)
-        Future.failed(canceledEvalException)
+        Future.failed(new CanceledEvalException( "FuturePlanEval received cancellation signal"))
       } else {
         Future.unit
       }
@@ -80,7 +90,7 @@ object FuturePlanEval {
     def evalTerminalStep[T](
       createStepFuture: => Future[( EvalState, Either[Throwable, T] )]
     ): Future[( EvalState, Either[Throwable, T] )] =
-      checkCancelFlag(state0, fa) *>
+      checkCancelFlag(state0) *>
       createStepFuture
 
     // when recursing on previous step, check cancel flag after building the Future for the previous step to ensure
@@ -88,7 +98,7 @@ object FuturePlanEval {
     def evalPrevStep[T](state: EvalState, fa: FuturePlan[T]): Future[( EvalState, Either[Throwable, T] )] =
       evalStep(state, fa)
         .flatTap { case ( runtimeState, _ ) =>
-          checkCancelFlag(runtimeState, fa)
+          checkCancelFlag(runtimeState)
         }
 
     fa match {
@@ -129,8 +139,8 @@ object FuturePlanEval {
           .flatMap {
             case ( runtimeState, Right( value ) ) =>
               evalStep( runtimeState, f( value ) )
-            case ( newState, Left( ex ) ) =>
-              Future.successful( ( newState, Left( ex ) ) )
+            case ( runtimeState, Left( ex ) ) =>
+              Future.successful( ( runtimeState, Left( ex ) ) )
           }( boundExecutionContext )
 
       case HandleErrorWith( prevStep, f ) =>
@@ -179,7 +189,7 @@ object FuturePlanEval {
         // note: no need to check cancelFlag here since we are canceling the FuturePlan eval
         // note: ok for this to run immediately since it will be running in caller's Future
         if (state0.ignoreCancelMaskDepth == 0) {
-          Future.failed(canceledEvalException)
+          Future.failed(new CanceledEvalException( "FuturePlanEval evaluated FuturePlan.canceled" ))
         } else {
           Future.successful( ( state0, Right( () ) ) )
         }
@@ -247,7 +257,7 @@ object FuturePlanEval {
         case Success( ( _, Left( ex ) ) ) =>
           executionContext.reportFailure(
             new RuntimeException(
-              "FuturePlan.eval unexpected exception during finalizer",
+              "FuturePlanEval unexpected exception during finalizer",
               ex
             ) )
       }
@@ -274,7 +284,7 @@ object FuturePlanEval {
       .tap( _.onComplete {
         case Failure( ex ) =>
           executionContext.reportFailure(
-            new RuntimeException( "FuturePlan.sleep unexpected exception", ex )
+            new RuntimeException( "FuturePlanEval sleep unexpected exception", ex )
           )
         case _ =>
           // do nothing

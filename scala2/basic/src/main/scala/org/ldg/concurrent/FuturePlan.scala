@@ -1,6 +1,6 @@
 package org.ldg.concurrent
 
-import cats.effect.{Async, IO}
+import cats.effect.Async
 import cats.effect.kernel.Poll
 
 import scala.concurrent.duration.FiniteDuration
@@ -15,15 +15,15 @@ import scala.util.{Failure, Success, Try}
   *
   * Unlike Future, a FuturePlan is pure, has referential transparency and is not eager, meaning that it can be
   * constructed and manipulated without executing the computation immediately (or any memoization). This means that
-  * while Async[Future] can't be safely implemented, Async[FuturePlan] can.
+  * while Async[Future] can't be safely/lawfully implemented, Async[FuturePlan] can.
   *
   * FuturePlan evaluation can be cancelled at runtime, but important to note that any Futures it defers or creates
   * themselves cannot be canceled. Though after Futures complete, the FuturePlan evaluation will cancel normally.
   *
   * To cancel FuturePlan evaluation:
-  *   1. use the `Async[FuturePlan].canceled` method
-  *   2. use the `CancellableEval.cancelEval` function
-  *   3. start a Fiber and call the fiber's `cancel` method
+  *   1. use the `FuturePlan.canceled` method
+  *   2. start a FuturePlan fiber and call the fiber's `cancel` method
+  *   3. call FuturePlan.eval and use the `CancellableEval.cancelEval` function
   *
   * @tparam A the type of the result of the computation
   */
@@ -98,9 +98,9 @@ object FuturePlan {
   /**
     * Creates a FuturePlan that will run the provided code block when evaluated.
     * Note: it is not possible for the FuturePlan to cancel the Future once it is running. If the FuturePlan is
-    * cancelled, then when Future completes, the FuturePlan will complete with a CancellationException (and run
-    * finalizers)
-    * @param thunk the code block to run when the FuturePlan is evaluated
+    * cancelled, then when Future completes, the FuturePlan will complete with a CanceledEvalException (after running
+    * all onCancel finalizers)
+    * @param thunk the code block to run within a Future when the FuturePlan is evaluated/run
     * @param executionContext the ExecutionContext to run the code block on
     * @tparam A the type of the result of the code block
     * @return a FuturePlan that will run the code block when evaluated
@@ -112,9 +112,11 @@ object FuturePlan {
     * Creates a FuturePlan that will run the provided Future when evaluated.
     * Note1: the Future is not memoized, meaning that it will be executed every time the FuturePlan is run.
     * Note2: it is not possible for the FuturePlan to cancel the Future once it is running. If the FuturePlan is
-    * cancelled, then when Future completes, the FuturePlan will complete with a CancellationException (and run
-    * finalizers)
-    * @param f the Future to create when the FuturePlan is evaluated
+    * cancelled, then when Future completes, the FuturePlan will complete with a CanceledEvalException (after running
+    * all onCancel finalizers)
+    *
+    * @param f the Future to create when the FuturePlan is evaluated/run. Note: each time the FuturePlan is run,
+   *          another Future will be created.
     * @tparam A the type of the result of the Future
     * @return a FuturePlan that will run the Future when evaluated
     */

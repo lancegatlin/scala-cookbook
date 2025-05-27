@@ -119,7 +119,20 @@ class FuturePlanSpec extends AnyFlatSpec with Matchers with ScalaFutures with Ba
   it should "cancel a FuturePlan and return a cancellation exception" in {
     val cancellablePlan = F.canceled
     val Left( result: CanceledEvalException ) = cancellablePlan.run().attempt.futureValue
-    result.getMessage shouldBe "FuturePlan eval canceled"
+    result.getMessage shouldBe "FuturePlanEval evaluated FuturePlan.canceled"
+  }
+
+  it should "cancel a running FuturePlan and return a cancellation exception" in {
+    val plan = FuturePlan.delay {
+      Thread.sleep( 50 ) // Simulate a long-running task
+      42
+    }.map(_ * 2)
+
+    val cancelableEval = plan.eval()
+    cancelableEval.cancelEval().futureValue
+    val result = cancelableEval.future.failed.futureValue
+    result shouldBe a[CanceledEvalException]
+    result.getMessage shouldBe "FuturePlanEval received cancellation signal"
   }
 
   it should "raise an error and propagate it through the FuturePlan" in {
