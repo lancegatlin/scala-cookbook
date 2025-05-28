@@ -148,7 +148,8 @@ object FuturePlanEval {
           .flatMap {
             case ( runtimeState, Left( ex ) )=>
               evalStep( runtimeState, f( ex ) )
-            case other => Future.successful(other)
+            case other =>
+              Future.successful(other)
           }
 
       case ForceR( fa, fb ) =>
