@@ -1,7 +1,8 @@
-package org.ldg.concurrent
+package org.ldg.effect
 
 import cats.effect.Async
 import cats.effect.kernel.Poll
+import org.ldg.concurrent.BlockingExecutionContext
 
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}

@@ -1,6 +1,7 @@
-package org.ldg.concurrent
+package org.ldg.effect
 
 import cats.effect.Async
+import org.ldg.concurrent.BlockingExecutionContext
 import org.ldg.concurrent.ExecutionContextExt.OrgLdgConcurrentExecutionExt
 
 import scala.concurrent.ExecutionContext

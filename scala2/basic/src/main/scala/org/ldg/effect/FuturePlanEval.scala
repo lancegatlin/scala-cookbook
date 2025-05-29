@@ -1,7 +1,6 @@
-package org.ldg.concurrent
+package org.ldg.effect
 
 import cats.implicits.{catsSyntaxApplyOps, toFlatMapOps}
-import org.ldg.concurrent.FuturePlan._
 import org.ldg.util.AnyTapExt.OrgLdgUtilAnyTapExt
 
 import java.util.concurrent.atomic.AtomicBoolean
@@ -9,6 +8,7 @@ import java.util.concurrent.{CompletableFuture, TimeUnit}
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.jdk.FutureConverters.CompletionStageOps
 import scala.util.{Failure, Success}
+import FuturePlan._
 
 trait FuturePlanEval {
   def apply[A]( plan: FuturePlan[A] )( implicit executionContext: ExecutionContext ): FuturePlanCancelableEval[A]

@@ -1,4 +1,4 @@
-package org.ldg.concurrent
+package org.ldg.effect
 
 import scala.concurrent.Future
 

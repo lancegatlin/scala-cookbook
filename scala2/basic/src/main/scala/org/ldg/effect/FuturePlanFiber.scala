@@ -1,4 +1,4 @@
-package org.ldg.concurrent
+package org.ldg.effect
 
 import cats.effect.kernel.{Fiber, Outcome}
 import org.ldg.util.AnyTapExt.OrgLdgUtilAnyTapExt

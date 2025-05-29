@@ -1,9 +1,10 @@
-package org.ldg.concurrent
+package org.ldg.effect
 
 import cats.effect.Async
 import cats.effect.implicits.monadCancelOps_
 import cats.effect.kernel.{Outcome, Sync}
 import org.ldg.concurrent.ExecutionContextExt.OrgLdgConcurrentExecutionExt
+import org.ldg.concurrent.BlockingExecutionContext
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers

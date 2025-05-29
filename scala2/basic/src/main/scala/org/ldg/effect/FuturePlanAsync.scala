@@ -1,8 +1,9 @@
-package org.ldg.concurrent
+package org.ldg.effect
 
 import cats.effect.kernel.{Fiber, Poll, Sync}
 import cats.effect.{Async, Cont, Ref, Deferred => CatsDeferred}
 import org.ldg.OrgLdgUtilAnyExt
+import org.ldg.concurrent.BlockingExecutionContext
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.{DurationLong, FiniteDuration}

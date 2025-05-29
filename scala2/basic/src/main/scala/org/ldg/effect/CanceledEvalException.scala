@@ -1,4 +1,4 @@
-package org.ldg.concurrent
+package org.ldg.effect
 
 /**
  * An exception that indicates an Async effect type's execution plan evaluation (e.g. FuturePlan) was canceled.
