@@ -7,6 +7,6 @@ import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
 class RetryCoreFutureSpec extends RetryCoreGenericSpec[Future] with ScalaFutures {
-  override protected def testRunSync[A](f: Future[A], timeoutDuration: FiniteDuration): A =
-    f.futureValue(timeout(timeoutDuration))
+  override protected def testRunSync[A]( f: Future[A], timeoutDuration: FiniteDuration ): A =
+    f.futureValue( timeout( timeoutDuration ) )
 }

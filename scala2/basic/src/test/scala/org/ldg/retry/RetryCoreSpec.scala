@@ -8,7 +8,7 @@ import java.io.FileNotFoundException
 import scala.concurrent.duration.DurationInt
 
 class RetryCoreSpec extends AnyFlatSpec with Matchers with Inside {
-  import org.ldg.retry.RetryCore._
+  import RetryCore._
 
   "defaultGenCorrelationId" should "generate a correlation id" in {
     val correlationId = defaultGenCorrelationId()
@@ -23,14 +23,14 @@ class RetryCoreSpec extends AnyFlatSpec with Matchers with Inside {
       new ReflectiveOperationException,
       new IllegalArgumentException,
       new ClassCastException,
-      new TypeNotPresentException("", new RuntimeException()),
+      new TypeNotPresentException( "", new RuntimeException() ),
       new UnsupportedOperationException,
       new CloneNotSupportedException,
       // fatal exception
       new ThreadDeath
     )
     unretryable.foreach { ex =>
-      defaultShouldRetry(ex) shouldBe false
+      defaultShouldRetry( ex ) shouldBe false
     }
   }
 
@@ -42,16 +42,16 @@ class RetryCoreSpec extends AnyFlatSpec with Matchers with Inside {
       baseDelay = baseDelay,
       maxJitter = maxJitter,
       maxDelay = maxDelay
-    )(_)
-    an[IllegalArgumentException] should be thrownBy fixture(0)
-    fixture(1) should (be >= baseDelay and be <= baseDelay + maxJitter)
-    fixture(2) should (be >= (baseDelay * 2) and be <= (baseDelay * 2) + maxJitter)
-    fixture(3) should (be >= (baseDelay * 4) and be <= (baseDelay * 4) + maxJitter)
-    fixture(4) should (be >= (baseDelay * 8) and be <= (baseDelay * 8) + maxJitter)
-    fixture(5) should (be >= (baseDelay * 16) and be <= (baseDelay * 16) + maxJitter)
-    fixture(6) should (be >= (baseDelay * 32) and be <= (baseDelay * 32) + maxJitter)
-    fixture(7) shouldBe maxDelay
-    fixture(8) shouldBe maxDelay
+    )( _ )
+    an[IllegalArgumentException] should be thrownBy fixture( 0 )
+    fixture( 1 ) should ((be >= baseDelay).and( be <= baseDelay + maxJitter ) )
+    fixture( 2 ) should ((be >= (baseDelay * 2)).and( be <= (baseDelay * 2) + maxJitter ) )
+    fixture( 3 ) should ((be >= (baseDelay * 4)).and( be <= (baseDelay * 4) + maxJitter ) )
+    fixture( 4 ) should ((be >= (baseDelay * 8)).and( be <= (baseDelay * 8) + maxJitter ) )
+    fixture( 5 ) should ((be >= (baseDelay * 16)).and( be <= (baseDelay * 16) + maxJitter ) )
+    fixture( 6 ) should ((be >= (baseDelay * 32)).and( be <= (baseDelay * 32) + maxJitter ) )
+    fixture( 7 ) shouldBe maxDelay
+    fixture( 8 ) shouldBe maxDelay
   }
 
   "defaultRetryDelayWithExponentialBackoffAndJitter" should "calculate correct delay for a given retry" in {
@@ -59,25 +59,25 @@ class RetryCoreSpec extends AnyFlatSpec with Matchers with Inside {
     val maxJitter = 10.millis
     val maxDelay = 10.seconds
     val fixture = defaultRetryDelayWithExponentialBackoffAndJitter
-    an[IllegalArgumentException] should be thrownBy fixture(0)
-    fixture(1) should (be >= initialDelay and be <= initialDelay + maxJitter)
-    fixture(2) should (be >= (initialDelay * 2) and be <= (initialDelay * 2) + maxJitter)
-    fixture(3) should (be >= (initialDelay * 4) and be <= (initialDelay * 4) + maxJitter)
-    fixture(4) should (be >= (initialDelay * 8) and be <= (initialDelay * 8) + maxJitter)
-    fixture(5) should (be >= (initialDelay * 16) and be <= (initialDelay * 16) + maxJitter)
-    fixture(6) should (be >= (initialDelay * 32) and be <= (initialDelay * 32) + maxJitter)
-    fixture(7) shouldBe maxDelay
-    fixture(8) shouldBe maxDelay
+    an[IllegalArgumentException] should be thrownBy fixture( 0 )
+    fixture( 1 ) should ((be >= initialDelay).and( be <= initialDelay + maxJitter ) )
+    fixture( 2 ) should ((be >= (initialDelay * 2)).and( be <= (initialDelay * 2) + maxJitter ) )
+    fixture( 3 ) should ((be >= (initialDelay * 4)).and( be <= (initialDelay * 4) + maxJitter ) )
+    fixture( 4 ) should ((be >= (initialDelay * 8)).and( be <= (initialDelay * 8) + maxJitter ) )
+    fixture( 5 ) should ((be >= (initialDelay * 16)).and( be <= (initialDelay * 16) + maxJitter ) )
+    fixture( 6 ) should ((be >= (initialDelay * 32)).and( be <= (initialDelay * 32) + maxJitter ) )
+    fixture( 7 ) shouldBe maxDelay
+    fixture( 8 ) shouldBe maxDelay
   }
 
   "recurseUntilUltimateCause" should "recurse until it returns the ultimate cause in a chain of throwables" in {
-    inside(recurseUntilUltimateCause(new RuntimeException("1", new RuntimeException("2", new RuntimeException("3"))))) {
+    inside( recurseUntilUltimateCause( new RuntimeException( "1", new RuntimeException( "2", new RuntimeException( "3" ) ) ) ) ) {
       case ex: RuntimeException =>
         ex.getMessage shouldBe "3"
     }
-    inside(recurseUntilUltimateCause(new RuntimeException("1"))) {
+    inside( recurseUntilUltimateCause( new RuntimeException( "1" ) ) ) {
       case ex: RuntimeException =>
-        ex .getMessage shouldBe "1"
+        ex.getMessage shouldBe "1"
     }
   }
 }
