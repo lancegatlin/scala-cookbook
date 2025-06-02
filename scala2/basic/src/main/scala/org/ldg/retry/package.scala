@@ -167,7 +167,7 @@ package object retry {
     * @param retryInterval the interval between retries
     * @return
     */
-  def retry[F[_], A](
+  def retryCapture[F[_], A](
       maxElapsedDuration: FiniteDuration,
       retryInterval: FiniteDuration
   )(
@@ -187,8 +187,9 @@ package object retry {
     * Example:
     *   {{{
     *     val doEffect: String => Future[String] = ???
-    *     val doEffectWithRetry: String => Future[String] = doEffect.withRetry(retry(5))
-    *     val myRetryPlan = retry(3).shouldRetry {
+    *     val doEffectWithRetry: String => Future[String] = doEffect.withRetry(RetryPlan(5))
+   *      // or
+    *     val myRetryPlan = RetryPlan(3).shouldRetry {
     *       case _:RuntimeException => false
     *     }
     *     val doEffectWithRetry2: String => Future[String] = doEffect.withRetry(myRetryPlan)
