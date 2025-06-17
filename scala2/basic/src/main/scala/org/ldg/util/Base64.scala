@@ -15,6 +15,7 @@ package org.ldg.util
   * Usage method 2:
   * {{{
   *   import cats.Id
+  *   import org.ldg.util.Base64
   *   import org.ldg.util.StringExt.charset
   *   import org.ldg.util.Base64Id.Implicits.base64UrlSafeId
   *   import org.ldg.util.ByteCoderExt._
@@ -26,6 +27,7 @@ package org.ldg.util
   * Usage method 3:
   * {{{
   *   import cats.Id
+  *   import org.ldg.util.Base64
   *   import org.ldg.util.StringExt.charset
   *   import org.ldg.util.Base64Id.Implicits.base64UrlSafeId
   *   val bytes: Array[Byte] = ???

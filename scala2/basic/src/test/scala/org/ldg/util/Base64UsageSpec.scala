@@ -34,6 +34,7 @@ class Base64UsageSpec extends AnyFlatSpec with Matchers {
   "Usage method 3 example" should "compile" in {
     object Usage3 {
       import cats.Id
+      import org.ldg.util.Base64
       import org.ldg.util.StringExt.charset
       import org.ldg.util.Base64Id.Implicits.base64UrlSafeId
       val bytes: Array[Byte] = ???
