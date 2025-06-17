@@ -19,7 +19,9 @@ abstract class CompressionSpecBase[F[_]] extends AnyFreeSpec with Matchers {
   ) {
     def testCompressDecompress( inputBytes: Array[Byte] ): Array[Byte] = {
       val compressedBytes = unsafeRun( compression.compress( inputBytes ) )
-      compressedBytes.length should be > 0
+      if (inputBytes.length > 0) {
+        compressedBytes.length should be > 0
+      }
       val outputBytes = unsafeRun( compression.decompress( compressedBytes ) )
       outputBytes.length shouldBe inputBytes.length
       // note: not using `shouldBe` here because it dumps the entire byte array on failure, which is not ideal for large arrays

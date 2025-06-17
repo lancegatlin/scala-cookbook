@@ -19,4 +19,9 @@ libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "3.2.19", //% Test
   "org.scalacheck" %% "scalacheck" % "1.18.1",
   "org.scalatestplus" %% "scalacheck-1-17" % "3.2.18.0",
+  "org.apache.pekko" %% "pekko-stream" % "1.0.3",
+  // for Gzip
+  "org.apache.pekko" %% "pekko-http" % "1.0.1",
+  "co.fs2" %% "fs2-core" % "3.12.0",
+  "de.lhns" %% "fs2-compress-gzip" % "2.3.0"
 )
