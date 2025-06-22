@@ -1,37 +1,37 @@
 package org.ldg.util
 
+import cats.Id
+
 /**
   * A tagless trait for compressing and decompressing byte arrays.
-  * Usage method 1:
+  * Usage method 1 (simplest):
   * {{{
-  *   import org.ldg.util.CompressionId.Implicits.compressGzipId
   *   import org.ldg.util.CompressionExt._
   *   val bytes: Array[Byte] = ???
   *
   *   val compressed = bytes.compressGzip
   *   val decompressed = compressed.decompressGzip
   * }}}
-  * Usage method 2:
+  * Usage method 2 (lifted):
   * {{{
-  *   import cats.Id
   *   import org.ldg.util.Compression
   *   import org.ldg.util.CompressionExt._
-  *   import org.ldg.util.CompressionId.Implicits.compressGzipId
+  *   import org.ldg.util.CompressionFuture.Implicits.compressionGzipFuture
   *   val bytes: Array[Byte] = ???
   *
-  *   val compressed = bytes.compress(Compression.Gzip[Id])
-  *   val decompressed = compressed.decompress(Compression.Gzip[Id])
+  *   val fCompressed: Future[Array[Byte]] = bytes.compress(Compression.Gzip[Future])
+  *   val decompressed: Future[Array[Byte]] = fCompressed.flatMap(compressed => compressed.decompress(Compression.Gzip[Future]))
   * }}}
-  * Usage method 3:
+  * Usage method 3 (functional/lifted):
   * {{{
-  *   import cats.Id
   *   import org.ldg.util.Compression
-  *   import org.ldg.util.CompressionId.Implicits.compressGzipId
+  *   import org.ldg.util.CompressionAsync.Implicits.compressGzipAsync
   *   val bytes: Array[Byte] = ???
   *
-  *   val compressed = Compression.Gzip[Id].compress(bytes)
-  *   val decompressed = Compression.Gzip[Id].decompress(compressed)
+  *   val fCompressed: IO[Array[Byte]] = Compression.Gzip[IO].compress(bytes)
+  *   val decompressed: IO[Array[Byte]] = fCompressed.flatMap(compressed => Compression.Gzip[IO].decompress(compressed))
   * }}}
+  *
   * @tparam F effect type (e.g. Id, Future, IO, etc.)
   */
 trait Compression[F[_]] {
@@ -52,6 +52,10 @@ trait Compression[F[_]] {
 }
 
 object Compression {
+  def apply[F[_]]( compressionType: CompressionMethod )(
+      implicit
+      compressionMethodResolver: CompressionMethodResolver[F] ): Compression[F] =
+    compressionMethodResolver.resolve( compressionType )
 
   /**
     * A class that delegates its implementation to another instance
@@ -71,8 +75,14 @@ object Compression {
   // supported compression protocols
 
   trait Gzip[F[_]] extends Compression[F]
-  object Gzip {
+  // note: inheriting from Id instance here allows specifying Compression.Gzip without needing to specify effect type
+  // e.g., mybytes.compress(Compression.Gzip) will be Id instance by default
+  object Gzip extends CompressionGzipId( GzipConfig.default ) {
     def apply[F[_]]( implicit gzip: Gzip[F] ): Gzip[F] = gzip
+
+    // note: putting implicit Compression.Gzip[Id] here means that for Id no import is required
+    implicit def compressionIdGzip( implicit gzipConfig: GzipConfig ): Compression.Gzip[Id] =
+      new CompressionGzipId( gzipConfig )
   }
 
   // maybe-do: add more compression protocols like deflate, Snappy, LZ4, etc.
