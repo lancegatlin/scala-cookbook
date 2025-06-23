@@ -2,7 +2,7 @@ package org.ldg.util
 
 import enumeratum._
 
-sealed trait CompressionMethod extends EnumEntryExt {
+sealed trait CompressionMethod extends EnumEntry {
   def toCompression[F[_]]( implicit compressionMethodResolver: CompressionMethodResolver[F] ): Compression[F] =
     compressionMethodResolver.resolve( this )
 }

@@ -17,10 +17,7 @@ object CompressionMethodResolver {
   // note: putting implicit for Id here means no import is required for CompressionMethodResolver[Id] instance
   // e.g., mystring.toCompressionMethod.toCompression will automatically find this implicit
   // CompressionMethodResolver[Id] instance without import or needing to specify Id
-  implicit object CompressionMethodResolverId extends CompressionMethodResolver[Id] {
-    override def resolve( compressionMethod: CompressionMethod ): Compression[Id] =
-      compressionMethod match {
-        case CompressionMethod.Gzip => Compression.Gzip
-      }
+  implicit def compressionMethodResolverId(implicit gzipConfig: GzipConfig): CompressionMethodResolver[Id] = {
+    case CompressionMethod.Gzip => new CompressionGzipId(gzipConfig)
   }
 }

@@ -23,5 +23,6 @@ libraryDependencies ++= Seq(
   // for Gzip
   "org.apache.pekko" %% "pekko-http" % "1.0.1",
   "co.fs2" %% "fs2-core" % "3.12.0",
-  "de.lhns" %% "fs2-compress-gzip" % "2.3.0"
+  "de.lhns" %% "fs2-compress-gzip" % "2.3.0",
+  "com.beachape" %% "enumeratum" % "1.9.0"
 )

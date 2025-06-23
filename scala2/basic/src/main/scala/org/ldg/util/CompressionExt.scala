@@ -2,7 +2,7 @@ package org.ldg.util
 
 import cats.Monad
 import cats.implicits.{catsSyntaxApplicativeId, toFlatMapOps}
-import org.ldg.util.AnyTransformExt.CatDigitalUtilAnyTransformExt
+import org.ldg.util.AnyTransformExt._
 
 object CompressionExt {
 

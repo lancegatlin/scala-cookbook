@@ -81,7 +81,7 @@ object Compression {
     def apply[F[_]]( implicit gzip: Gzip[F] ): Gzip[F] = gzip
 
     // note: putting implicit Compression.Gzip[Id] here means that for Id no import is required
-    implicit def compressionIdGzip( implicit gzipConfig: GzipConfig ): Compression.Gzip[Id] =
+    implicit def compressionGzipId(implicit gzipConfig: GzipConfig ): Compression.Gzip[Id] =
       new CompressionGzipId( gzipConfig )
   }
 
