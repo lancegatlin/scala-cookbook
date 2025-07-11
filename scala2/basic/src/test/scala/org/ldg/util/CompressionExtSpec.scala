@@ -12,7 +12,8 @@ class CompressionExtSpec extends AnyFlatSpec with Matchers {
   import org.ldg.util.Compression.Gzip.compressionGzipId
 
   def genInputString(): String = Random.nextString( Random.nextInt( 1024 ) + 128 )
-  def genInputBytes(): Array[Byte] = genInputString().stringToBytes
+  // todo: stringToBytes
+  def genInputBytes(): Array[Byte] = genInputString().getBytes()
 
   "ByteArray.compress/decompress" should "act as syntactic-sugar for compress/decompress" in {
     val inputBytes = genInputBytes()
