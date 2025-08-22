@@ -24,5 +24,9 @@ libraryDependencies ++= Seq(
   "org.apache.pekko" %% "pekko-http" % "1.0.1",
   "co.fs2" %% "fs2-core" % "3.12.0",
   "de.lhns" %% "fs2-compress-gzip" % "2.3.0",
-  "com.beachape" %% "enumeratum" % "1.9.0"
+  "com.beachape" %% "enumeratum" % "1.9.0",
+  "io.circe" %% "circe-core" % "0.14.14",
+  "io.circe" %% "circe-generic" % "0.14.14",
+  "io.circe" %% "circe-generic-extras" % "0.14.4",
+  "io.circe" %% "circe-parser" % "0.14.14"
 )
