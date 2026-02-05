@@ -1,0 +1,8 @@
+.ft
+.it
+.ut
+.idea
+.vscode
+.bsp
+.DS_Store
+target/
